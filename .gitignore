@@ -1,0 +1,58 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.venv/
+venv/
+env/
+
+# Data & cache (never commit raw data)
+backend/data/
+backend/experiments/mlruns/
+*.parquet
+*.csv
+*.h5
+*.pkl
+*.joblib
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# ML artifacts
+*.model
+*.xgb
+mlruns/
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docker
+.dockerignore
+
+# Coverage
+.coverage
+htmlcov/
+.pytest_cache/

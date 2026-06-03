@@ -1,0 +1,96 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-ink-950 text-frost-200 font-sans antialiased;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -20%, rgba(63, 185, 80, 0.06), transparent),
+      radial-gradient(ellipse 60% 40% at 80% 80%, rgba(227, 179, 65, 0.03), transparent);
+    min-height: 100vh;
+  }
+
+  ::selection {
+    @apply bg-jade-600 text-white;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-ink-900;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-ink-600 rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-ink-500;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-ink-800 border border-ink-700 rounded-xl;
+  }
+
+  .card-hover {
+    @apply card transition-all duration-200 hover:border-ink-600 hover:bg-ink-700;
+  }
+
+  .badge-buy {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-mono font-medium
+           bg-jade-600/20 text-jade-400 border border-jade-600/30;
+  }
+
+  .badge-sell {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-mono font-medium
+           bg-coral-500/20 text-coral-400 border border-coral-500/30;
+  }
+
+  .badge-hold {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-mono font-medium
+           bg-gold-500/20 text-gold-400 border border-gold-500/30;
+  }
+
+  .stat-label {
+    @apply text-xs font-mono text-frost-400 uppercase tracking-wider;
+  }
+
+  .stat-value {
+    @apply text-lg font-mono font-medium text-frost-100;
+  }
+
+  .btn-primary {
+    @apply px-4 py-2 rounded-lg bg-jade-600 hover:bg-jade-500
+           text-white font-sans font-medium text-sm
+           transition-all duration-150 active:scale-95
+           disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100;
+  }
+
+  .btn-ghost {
+    @apply px-4 py-2 rounded-lg border border-ink-600 hover:border-ink-500
+           text-frost-300 hover:text-frost-100 font-sans font-medium text-sm
+           transition-all duration-150 active:scale-95;
+  }
+
+  .input-base {
+    @apply w-full bg-ink-900 border border-ink-600 rounded-lg px-4 py-2.5
+           text-frost-100 placeholder-frost-400 font-sans text-sm
+           focus:outline-none focus:border-jade-500 focus:ring-1 focus:ring-jade-500/30
+           transition-all duration-150;
+  }
+
+  .section-title {
+    @apply font-display text-frost-100 font-semibold tracking-tight;
+  }
+}
