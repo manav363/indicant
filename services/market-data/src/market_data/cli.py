@@ -4,6 +4,8 @@
     indicant-md ingest --date 2026-07-30
     indicant-md validate --date 2026-07-30
     indicant-md calendar --from 2015-01-01 --to 2015-12-31 --learn
+    indicant-md actions --file corp_actions.csv
+    indicant-md adjust
     indicant-md universe --as-of 2026-07-30
     indicant-md continuity --from 2006-01-01
     indicant-md quarantine [--date ...]
@@ -19,9 +21,11 @@ import argparse
 import sys
 from datetime import date, timedelta
 
-from indicant_contracts import Verdict
+import pandas as pd
+from indicant_contracts import Dataset, Verdict
 
-from market_data.adjust.factors import continuity_breaks
+from market_data.adjust.factors import adjust_all, continuity_breaks
+from market_data.ingest import corporate_actions as ca_ingest
 from market_data.ingest.bhavcopy import HttpBhavcopyFetcher, LocalBhavcopyFetcher
 from market_data.ingest.calendar import TradingCalendarService
 from market_data.pipeline import DayResult, IngestPipeline
@@ -126,6 +130,97 @@ def cmd_calendar(args: argparse.Namespace) -> int:
                 print(f"  skipped {year}: {exc}")
         path = calendar.save()
         print(f"  wrote {path}")
+    return 0
+
+
+def _load_actions(lake: Lake) -> list:
+    """Read stored corporate actions back into contract objects.
+
+    `confident_only=True`: only confidently-parsed ratios may explain away a
+    price break. A wrongly-explained break is worse than an unexplained one,
+    because the unexplained one gets investigated.
+    """
+    stored = lake.read_dataset(Dataset.CORP_ACTIONS)
+    if stored.empty:
+        return []
+    return ca_ingest.from_frame(
+        stored.rename(columns={"raw_text": "purpose"}),
+        confident_only=True,
+    )
+
+
+def cmd_actions(args: argparse.Namespace) -> int:
+    """Load a corporate-actions CSV into the lake.
+
+    Takes a file rather than fetching, because NSE's corporate-actions endpoint
+    is session-gated and inconsistent in a way that would make an automated
+    fetcher silently wrong. Deriving a wrong ratio launders a bad price, so this
+    step is explicit and reviewable. `nselib.get_corporate_actions()` produces a
+    compatible frame.
+    """
+    settings = get_settings()
+    lake = Lake(settings.paths)
+
+    raw = pd.read_csv(args.file)
+    raw.columns = [str(c).strip().lower() for c in raw.columns]
+    actions = ca_ingest.from_frame(raw, confident_only=False)
+    frame = ca_ingest.to_frame(actions)
+
+    if frame.empty:
+        print("no corporate actions parsed")
+        return 1
+
+    lake.write_partition(
+        frame, dataset=Dataset.CORP_ACTIONS, when=max(a.ex_date for a in actions)
+    )
+    price_affecting = int(frame["affects_price"].sum())
+    print(f"loaded {len(frame)} corporate actions ({price_affecting} affect price)")
+
+    unrecognised = frame[frame["action_type"] == "other"]
+    if not unrecognised.empty:
+        print(
+            f"  {len(unrecognised)} purposes not recognised — left at ratio 1.0 so the "
+            "continuity sweep surfaces them rather than laundering a bad price"
+        )
+    return 0
+
+
+def cmd_adjust(args: argparse.Namespace) -> int:
+    """Write the back-adjusted price dataset.
+
+    A separate step rather than part of ingestion: adjustment is a whole-history
+    rewrite (a split today restates twenty years of prices), so it cannot be
+    done incrementally per day.
+    """
+    settings = get_settings()
+    lake = Lake(settings.paths)
+
+    prices = lake.read_prices(start=args.start, end=args.end)
+    if prices.empty:
+        print("no prices to adjust")
+        return 1
+
+    actions = _load_actions(lake)
+    adjusted = adjust_all(prices, actions)
+
+    years = sorted({d.year for d in adjusted["date"]})
+    for year in years:
+        chunk = adjusted[[d.year == year for d in adjusted["date"]]]
+        lake.write_year([chunk], year=year, dataset=Dataset.ADJUSTED)
+
+    print(f"adjusted {len(adjusted):,} rows across {len(years)} years")
+    print(f"  corporate actions applied: {len(actions)}")
+
+    # The correctness check for this step, run immediately rather than left for
+    # someone to remember.
+    breaks = continuity_breaks(adjusted, actions=actions)
+    unexplained = breaks[~breaks["explained"]] if not breaks.empty else breaks
+    print(f"  post-adjustment unexplained continuity breaks: {len(unexplained)}")
+    if len(unexplained):
+        print(
+            "  the adjustment is incomplete — run 'indicant-md continuity' for detail",
+            file=sys.stderr,
+        )
     return 0
 
 
@@ -251,6 +346,15 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--to", dest="end", type=_iso, default=date.today())
     p.add_argument("--learn", action="store_true", help="derive holidays from observed days")
     p.set_defaults(func=cmd_calendar)
+
+    p = sub.add_parser("actions", help="load a corporate-actions CSV into the lake")
+    p.add_argument("--file", type=str, required=True)
+    p.set_defaults(func=cmd_actions)
+
+    p = sub.add_parser("adjust", help="write the back-adjusted price dataset")
+    p.add_argument("--from", dest="start", type=_iso, default=None)
+    p.add_argument("--to", dest="end", type=_iso, default=None)
+    p.set_defaults(func=cmd_adjust)
 
     p = sub.add_parser("universe", help="build and write the point-in-time universe")
     p.add_argument("--as-of", dest="as_of", type=_iso, default=date.today())

@@ -590,6 +590,51 @@ class TestAdjustment:
         breaks = continuity_breaks(prices, actions=[self._split(date(2015, 3, 4))])
         assert bool(breaks.loc[0, "explained"])
 
+    def test_prev_close_uses_the_prior_days_factor(self) -> None:
+        """Regression. prev_close belongs to the PREVIOUS trading day, so it
+        takes the previous day's factor — not this row's.
+
+        Using this row's factor leaves prev_close unadjusted while close is
+        adjusted, producing an artificial continuity break on every corporate
+        action. The Tier-4 rule caught this on real data.
+        """
+        prices = pd.DataFrame(
+            [
+                {"date": date(2015, 3, 3), "symbol": "RELIANCE", "close": 100.0,
+                 "open": 100.0, "high": 100.0, "low": 100.0, "prev_close": 99.0,
+                 "volume": 1_000_000, "turnover": 1e8},
+                # Ex-date: exchange reports the post-split price, and prev_close
+                # is the pre-split 100.0.
+                {"date": date(2015, 3, 4), "symbol": "RELIANCE", "close": 51.0,
+                 "open": 50.0, "high": 52.0, "low": 49.0, "prev_close": 100.0,
+                 "volume": 2_000_000, "turnover": 1.02e8},
+            ]
+        )
+        out = adjust_symbol(prices, [self._split(date(2015, 3, 4))], symbol="RELIANCE")
+
+        # Day 1 fully scaled by 0.5.
+        assert out.loc[0, "close"] == pytest.approx(50.0)
+        # Day 2 is on/after the ex-date, so its own prices are untouched...
+        assert out.loc[1, "close"] == pytest.approx(51.0)
+        # ...but its prev_close takes day 1's factor and becomes comparable.
+        assert out.loc[1, "prev_close"] == pytest.approx(50.0)
+
+    def test_adjustment_leaves_no_continuity_breaks(self) -> None:
+        """The end-to-end invariant: after adjustment, prev_close(t) must equal
+        close(t-1) with no corporate action needed to explain it."""
+        prices = pd.DataFrame(
+            [
+                {"date": date(2015, 3, 3), "symbol": "RELIANCE", "close": 100.0,
+                 "open": 100.0, "high": 100.0, "low": 100.0, "prev_close": 100.0,
+                 "volume": 1_000_000, "turnover": 1e8},
+                {"date": date(2015, 3, 4), "symbol": "RELIANCE", "close": 50.0,
+                 "open": 50.0, "high": 50.0, "low": 50.0, "prev_close": 100.0,
+                 "volume": 2_000_000, "turnover": 1e8},
+            ]
+        )
+        out = adjust_symbol(prices, [self._split(date(2015, 3, 4))], symbol="RELIANCE")
+        assert continuity_breaks(out).empty
+
     def test_clean_series_has_no_breaks(self) -> None:
         prices = pd.DataFrame(
             [

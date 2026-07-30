@@ -65,7 +65,10 @@ def cumulative_factors(
                 f"{action.action_type.value} on {action.ex_date}"
             )
 
-    ordered = sorted(dates)
+    # Coerce at the boundary: parquet and DuckDB hand back Timestamps, and
+    # `Timestamp > date` raises. Doing it here rather than at every call site
+    # keeps the comparison below correct regardless of where the dates came from.
+    ordered = sorted({as_date(d) for d in dates})
     factors: list[float] = []
     for d in ordered:
         factor = 1.0
@@ -94,12 +97,25 @@ def adjust_symbol(
         return prices.copy()
 
     out = prices.sort_values("date").copy()
+    # Normalise the column too, so the map lookup below has matching key types.
+    out["date"] = [as_date(d) for d in out["date"]]
     factors = cumulative_factors(actions, symbol=symbol, dates=out["date"].tolist())
     out["adj_factor"] = out["date"].map(factors).astype("float64")
 
-    for col in ("open", "high", "low", "close", "prev_close"):
+    for col in ("open", "high", "low", "close"):
         if col in out.columns:
             out[col] = out[col] * out["adj_factor"]
+
+    if "prev_close" in out.columns:
+        # prev_close belongs to the PREVIOUS trading day, so it takes the
+        # previous day's factor — not this row's. On an ex-date the two differ by
+        # exactly the split ratio, and using this row's factor leaves prev_close
+        # unadjusted while close is adjusted. That produces an artificial
+        # continuity break on every corporate action, which is precisely what
+        # the Tier-4 rule exists to catch. It caught this.
+        prior_factor = out["adj_factor"].shift(1)
+        prior_factor.iloc[:1] = out["adj_factor"].iloc[:1]
+        out["prev_close"] = out["prev_close"] * prior_factor
 
     if "volume" in out.columns:
         # Inverse: shares outstanding move opposite to price.
