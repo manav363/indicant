@@ -28,8 +28,8 @@ Math covered in this file:
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass
+from typing import Any, Optional
 
 import numpy as np
 import pandas as pd
@@ -222,6 +222,8 @@ class LogisticRegressionScratch(BaseModel):
         X: np.ndarray,
         y: np.ndarray,
         feature_names: Optional[list[str]] = None,
+        registry: Optional[Any] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> "LogisticRegressionScratch":
         """
         Train the model using gradient descent.
@@ -234,6 +236,10 @@ class LogisticRegressionScratch(BaseModel):
             Binary labels. Must be 0 or 1.
         feature_names : list[str], optional
             Names for each feature column. Used for reporting.
+        registry : ModelRegistry, optional
+            If provided, logs this training run after fit completes.
+        metadata : dict, optional
+            Run metadata for the registry (ticker, data_start, etc.).
 
         Returns
         -------
@@ -315,6 +321,28 @@ class LogisticRegressionScratch(BaseModel):
             "Training complete. Final loss: %.6f (%.0f%% of class 1)",
             self.loss_history[-1], y.mean() * 100
         )
+
+        # ── Model registry logging ─────────────────────────────────────────
+        if registry is not None:
+            from market_regime.registry.model_registry import ModelRegistry as _Reg
+            if not isinstance(registry, _Reg):
+                logger.warning("fit() called with invalid registry instance — skipping log.")
+            else:
+                run_meta = {
+                    "ticker": (metadata or {}).get("ticker", ""),
+                    "model_type": "logistic",
+                    "model_config": cfg,
+                    "data_start": (metadata or {}).get("data_start", ""),
+                    "data_end": (metadata or {}).get("data_end", ""),
+                    "n_samples": len(X),
+                    "n_features": X.shape[1],
+                    "horizon_days": (metadata or {}).get("horizon_days", 126),
+                    "label_threshold": (metadata or {}).get("label_threshold", 0.0),
+                    "feature_list": self.feature_names,
+                }
+                registry.log_run(run_meta)
+                logger.info("Logged run to model registry.")
+
         return self
 
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
