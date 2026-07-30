@@ -21,7 +21,7 @@ const CustomTooltip = ({ active, payload, label }) => {
   )
 }
 
-export default function PriceChart({ data, indicators }) {
+export default function PriceChart({ data }) {
   const chartData = useMemo(() => {
     if (!data?.length) return []
     const step = Math.max(1, Math.floor(data.length / 200))
