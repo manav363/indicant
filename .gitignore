@@ -16,11 +16,15 @@ env/
 # Data & cache (never commit raw data)
 backend/data/
 backend/experiments/mlruns/
+data/
 *.parquet
 *.csv
 *.h5
 *.pkl
 *.joblib
+# Test fixtures ARE committed — they are small, hand-built, and load-bearing
+!**/tests/fixtures/**/*.csv
+!**/tests/fixtures/**/*.parquet
 
 # Environment
 .env
@@ -52,7 +56,17 @@ Thumbs.db
 # Docker
 .dockerignore
 
+# SQLite WAL temp files (not the main db — model_registry.db IS committed)
+*.db-wal
+*.db-shm
+
 # Coverage
 .coverage
 htmlcov/
 .pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Agent tooling
+.claude-flow/
+.hive-mind/
