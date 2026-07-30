@@ -36,7 +36,7 @@ from sklearn.linear_model import LogisticRegression, SGDClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.preprocessing import StandardScaler
 
-from intelligence.validation.panel_cv import PanelSplit, PurgedPanelCV
+from intelligence.validation.panel_cv import PurgedPanelCV
 
 logger = logging.getLogger(__name__)
 

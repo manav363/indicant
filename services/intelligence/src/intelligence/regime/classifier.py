@@ -20,7 +20,6 @@ Usage
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -36,7 +35,7 @@ class RegimeResult:
     ticker: str
     primary_regime: str  # "Bull" | "Bear" | "RangeBound" | "HighVol" | "LowVol"
     regime_score: float  # confidence in the classification, 0..1
-    adx: Optional[float]
+    adx: float | None
     trend_direction: str  # "up" | "down" | "sideways"
     volatility_regime: str  # "low" | "normal" | "high"
     drawdown_regime: str  # "peak" | "normal" | "correction" | "bear"
@@ -161,7 +160,7 @@ class RegimeClassifier:
 
     @staticmethod
     def _compute_confidence(
-        adx: float, trend_consistency: Optional[float], regime: str
+        adx: float, trend_consistency: float | None, regime: str
     ) -> float:
         """
         Compute a 0..1 confidence score for the classification.
@@ -185,9 +184,9 @@ class RegimeClassifier:
 
         # Boost if trend consistency agrees
         if trend_consistency is not None and not pd.isna(trend_consistency):
-            if regime == "Bull" and trend_consistency > cfg.TREND_CONSISTENT_HIGH or regime == "Bear" and trend_consistency < cfg.TREND_CONSISTENT_LOW:
+            if (regime == "Bull" and trend_consistency > cfg.TREND_CONSISTENT_HIGH) or (regime == "Bear" and trend_consistency < cfg.TREND_CONSISTENT_LOW):
                 conf = min(1.0, conf + 0.10)
-            elif regime == "Bull" and trend_consistency < cfg.TREND_CONSISTENT_LOW or regime == "Bear" and trend_consistency > cfg.TREND_CONSISTENT_HIGH:
+            elif (regime == "Bull" and trend_consistency < cfg.TREND_CONSISTENT_LOW) or (regime == "Bear" and trend_consistency > cfg.TREND_CONSISTENT_HIGH):
                 conf = max(0.0, conf - 0.10)
 
         return conf
@@ -223,7 +222,7 @@ class RegimeClassifier:
             return "normal"
 
     @staticmethod
-    def _classify_drawdown(drawdown: Optional[float]) -> str:
+    def _classify_drawdown(drawdown: float | None) -> str:
         """Classify drawdown regime from the drawdown fraction (always ≤ 0)."""
         if drawdown is None or pd.isna(drawdown):
             return "normal"

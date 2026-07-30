@@ -22,7 +22,6 @@ import logging
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
 
 import numpy as np
 
@@ -45,7 +44,7 @@ class MarketRegimeResult:
     constituents_reporting: int
     primary_regime: str
     regime_distribution: dict[str, int]
-    market_adx: Optional[float]
+    market_adx: float | None
     composite_signal: str
     details: list[RegimeResult] = field(default_factory=list)
     cache_ttl_minutes: int = 15  # advertised so callers know the staleness window

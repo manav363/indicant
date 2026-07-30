@@ -5,7 +5,7 @@ Tests for the permutation test module.
 """
 
 import dataclasses
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -32,11 +32,11 @@ class _MockModelConfig:
 class _MockModel:
     """Minimal model mock that implements BaseModel interface for testing."""
 
-    def __init__(self, config: Optional[_MockModelConfig] = None):
+    def __init__(self, config: _MockModelConfig | None = None):
         self.config = config or _MockModelConfig()
         self.is_fitted = True
         self.feature_names: list[str] = []
-        self.run_id: Optional[str] = None
+        self.run_id: str | None = None
 
     def fit(self, X, y, feature_names=None, registry=None, metadata=None):
         return self

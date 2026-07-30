@@ -110,11 +110,13 @@ def time_decay(uniqueness: np.ndarray, last_weight: float = 1.0) -> np.ndarray:
     if total <= 0:
         return np.where(valid, 1.0, np.nan)
 
-    if last_weight >= 0:
-        slope = (1.0 - last_weight) / total
-    else:
-        # Negative last_weight zeroes out the oldest observations entirely.
-        slope = 1.0 / ((last_weight + 1) * total)
+    # Two genuinely different behaviours, kept as branches rather than a
+    # ternary: >= 0 decays toward last_weight; < 0 zeroes the oldest entirely.
+    slope = (
+        (1.0 - last_weight) / total
+        if last_weight >= 0
+        else 1.0 / ((last_weight + 1) * total)
+    )
     const = 1.0 - slope * total
 
     weights = const + slope * cumulative

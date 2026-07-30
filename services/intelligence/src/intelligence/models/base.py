@@ -12,7 +12,6 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -63,8 +62,8 @@ class BaseModel(ABC):
         self,
         X: np.ndarray,
         y: np.ndarray,
-        feature_names: Optional[list[str]] = None,
-    ) -> "BaseModel":
+        feature_names: list[str] | None = None,
+    ) -> BaseModel:
         """Train the model on features X and labels y."""
         ...
 

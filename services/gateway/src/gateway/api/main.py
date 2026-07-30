@@ -17,8 +17,17 @@ import asyncio
 import os
 
 import httpx
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from indicant_contracts import Prediction
+
+from gateway.charts.payloads import verdict_bar_payload
+from gateway.composition.client import (
+    UpstreamClient,
+    first_failure,
+    gather_upstreams,
+)
+from gateway.narrative.templates import render
 
 MARKET_DATA_URL = os.environ.get("INDICANT_MARKET_DATA_URL", "http://market-data:8000")
 INTELLIGENCE_URL = os.environ.get("INDICANT_INTELLIGENCE_URL", "http://intelligence:8000")
@@ -90,3 +99,66 @@ async def universe(as_of: str | None = None, index: str | None = None) -> dict[s
         resp = await client.get(f"{MARKET_DATA_URL}/universe", params=params, timeout=30.0)
         resp.raise_for_status()
         return dict(resp.json())
+
+
+@app.get("/api/predict/{symbol}")
+async def predict(symbol: str, horizon_months: int = 6) -> dict[str, object]:
+    """Composed stock view: prediction + regime, rendered to plain English.
+
+    Fans out in parallel — the two upstream calls have no dependency on each
+    other, so sequential would make page latency their sum.
+
+    The prediction is essential; the regime is not. A missing regime read
+    degrades the page to one without market context, which is still useful. A
+    missing prediction has nothing to show, so it surfaces the upstream's own
+    error envelope rather than the gateway inventing one.
+    """
+    intel = UpstreamClient(INTELLIGENCE_URL)
+    results = await gather_upstreams(
+        [
+            (intel, "prediction", f"/predict?symbol={symbol.upper()}"
+                                  f"&horizon_months={horizon_months}", None),
+            (intel, "regime", f"/regime/{symbol.upper()}", None),
+            (intel, "model", "/model/current", None),
+        ]
+    )
+
+    failed = first_failure(results, essential=["prediction"])
+    if failed is not None:
+        envelope = failed.error
+        raise HTTPException(
+            status_code=failed.status_code or 503,
+            detail=envelope.model_dump() if envelope else {"code": "internal"},
+        )
+
+    payload = results["prediction"].data
+    prediction = Prediction.model_validate(payload)
+
+    model_card = results["model"].data if results["model"].ok else None
+    is_significant = None
+    if isinstance(model_card, dict):
+        p = model_card.get("permutation_p_value")
+        is_significant = None if p is None else bool(p < 0.05)
+
+    narrative = render(prediction, is_significant=is_significant)
+
+    return {
+        "prediction": payload,
+        "narrative": {
+            "headline": narrative.headline,
+            "probability": narrative.probability,
+            "supports": list(narrative.supports),
+            "opposes": list(narrative.opposes),
+            "regime": narrative.regime,
+            "conviction": narrative.conviction,
+            "caveats": list(narrative.caveats),
+        },
+        "verdictBar": verdict_bar_payload(
+            probability_up=prediction.probability_up,
+            signal=prediction.signal.value,
+            strength=prediction.strength.value,
+        ),
+        # Reported rather than hidden: a page built from a partial fan-out is
+        # not the same object as one built from a complete fan-out.
+        "degraded": [name for name, r in results.items() if not r.ok],
+    }

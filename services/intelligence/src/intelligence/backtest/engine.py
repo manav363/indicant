@@ -37,7 +37,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pandas as pd
@@ -179,7 +179,7 @@ class BacktestResult:
     num_trades: int = 0
     start_date: str = ""
     end_date: str = ""
-    run_id: Optional[str] = None
+    run_id: str | None = None
     folds: list[FoldResult] = field(default_factory=list)
     daily_returns: list[float] = field(default_factory=list)
 
@@ -229,11 +229,11 @@ def run_backtest(
     df: pd.DataFrame,
     feature_cols: list[str],
     horizon_days: int = 126,
-    wf_config: Optional[WalkForwardConfig] = None,
-    bt_config: Optional[BacktestConfig] = None,
+    wf_config: WalkForwardConfig | None = None,
+    bt_config: BacktestConfig | None = None,
     registry: Any = None,
-    run_id: Optional[str] = None,
-    labels: Optional[pd.Series] = None,
+    run_id: str | None = None,
+    labels: pd.Series | None = None,
 ) -> BacktestResult:
     """
     Run a purged walk-forward backtest for a single stock.

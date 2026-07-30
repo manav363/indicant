@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -82,26 +82,26 @@ class GradientBoostModel(BaseModel):
     Wraps xgb.XGBClassifier with our BaseModel interface.
     """
 
-    def __init__(self, config: Optional[GradientBoostConfig] = None) -> None:
+    def __init__(self, config: GradientBoostConfig | None = None) -> None:
         self.config = config or GradientBoostConfig()
-        self.model: Optional[xgb.XGBClassifier] = None
+        self.model: xgb.XGBClassifier | None = None
         self.calibrated_model = None
         self._calibrator = None
         self._calibrated = False
         self.feature_names: list[str] = []
         self.is_fitted: bool = False
-        self.run_id: Optional[str] = None       # model registry run ID, set after fit()
+        self.run_id: str | None = None       # model registry run ID, set after fit()
 
     def fit(
         self,
         X: np.ndarray,
         y: np.ndarray,
-        feature_names: Optional[list[str]] = None,
-        X_val: Optional[np.ndarray] = None,
-        y_val: Optional[np.ndarray] = None,
-        registry: Optional[Any] = None,
-        metadata: Optional[dict[str, Any]] = None,
-    ) -> "GradientBoostModel":
+        feature_names: list[str] | None = None,
+        X_val: np.ndarray | None = None,
+        y_val: np.ndarray | None = None,
+        registry: Any | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> GradientBoostModel:
         """
         Train XGBoost model.
 

@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
@@ -96,7 +96,7 @@ class PermutationTest:
 
     def __init__(
         self,
-        config: Optional[PermutationConfig] = None,
+        config: PermutationConfig | None = None,
     ) -> None:
         self.config = config or PermutationConfig()
 
@@ -107,10 +107,10 @@ class PermutationTest:
         df: pd.DataFrame,
         feature_cols: list[str],
         horizon_days: int = 126,
-        wf_config: Optional[WalkForwardConfig] = None,
-        bt_config: Optional[BacktestConfig] = None,
+        wf_config: WalkForwardConfig | None = None,
+        bt_config: BacktestConfig | None = None,
         registry: Any = None,
-        run_id: Optional[str] = None,
+        run_id: str | None = None,
     ) -> PermutationResult:
         """
         Run the full permutation test.

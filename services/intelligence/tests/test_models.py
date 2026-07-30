@@ -8,11 +8,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from intelligence.models.linear_scratch import LogisticRegressionScratch, LogisticConfig
 from intelligence.models.base import PredictionResult
-from intelligence.models.signals import generate_signal, ensemble_signal, Signal
+from intelligence.models.linear_scratch import LogisticConfig, LogisticRegressionScratch
+from intelligence.models.signals import Signal, ensemble_signal, generate_signal
 from intelligence.models.sizing import kelly_fraction, recommended_position
-
 
 # ── Logistic Regression tests ─────────────────────────────────────────────────
 
@@ -209,7 +208,7 @@ class TestGradientBoost:
         return X, y
 
     def test_fit_runs(self):
-        from intelligence.models.boosted import GradientBoostModel, GradientBoostConfig
+        from intelligence.models.boosted import GradientBoostConfig, GradientBoostModel
         cfg = GradientBoostConfig(n_estimators=10, early_stopping_rounds=None, calibrate=False)
         model = GradientBoostModel(cfg)
         X, y = self._make_data(200, 5)
@@ -218,7 +217,7 @@ class TestGradientBoost:
         assert model.model is not None
 
     def test_predict_proba_shape(self):
-        from intelligence.models.boosted import GradientBoostModel, GradientBoostConfig
+        from intelligence.models.boosted import GradientBoostConfig, GradientBoostModel
         cfg = GradientBoostConfig(n_estimators=10, early_stopping_rounds=None, calibrate=False)
         model = GradientBoostModel(cfg)
         X, y = self._make_data(200, 5)
@@ -227,7 +226,7 @@ class TestGradientBoost:
         assert proba.shape == (len(X), 2)
 
     def test_predict_proba_sums_to_one(self):
-        from intelligence.models.boosted import GradientBoostModel, GradientBoostConfig
+        from intelligence.models.boosted import GradientBoostConfig, GradientBoostModel
         cfg = GradientBoostConfig(n_estimators=10, early_stopping_rounds=None, calibrate=False)
         model = GradientBoostModel(cfg)
         X, y = self._make_data(200, 5)
@@ -236,7 +235,7 @@ class TestGradientBoost:
         np.testing.assert_allclose(proba.sum(axis=1), 1.0, atol=1e-6)
 
     def test_predict_returns_binary(self):
-        from intelligence.models.boosted import GradientBoostModel, GradientBoostConfig
+        from intelligence.models.boosted import GradientBoostConfig, GradientBoostModel
         cfg = GradientBoostConfig(n_estimators=10, early_stopping_rounds=None, calibrate=False)
         model = GradientBoostModel(cfg)
         X, y = self._make_data(200, 5)
@@ -245,7 +244,7 @@ class TestGradientBoost:
         assert set(np.unique(preds)).issubset({0, 1})
 
     def test_learns_separable_data(self):
-        from intelligence.models.boosted import GradientBoostModel, GradientBoostConfig
+        from intelligence.models.boosted import GradientBoostConfig, GradientBoostModel
         cfg = GradientBoostConfig(n_estimators=20, early_stopping_rounds=None, calibrate=False)
         model = GradientBoostModel(cfg)
         X, y = self._make_data(500, 5)
@@ -255,7 +254,7 @@ class TestGradientBoost:
         assert accuracy > 0.80
 
     def test_predict_df_returns_prediction_result(self):
-        from intelligence.models.boosted import GradientBoostModel, GradientBoostConfig
+        from intelligence.models.boosted import GradientBoostConfig, GradientBoostModel
         cfg = GradientBoostConfig(n_estimators=10, early_stopping_rounds=None, calibrate=False)
         model = GradientBoostModel(cfg)
         X, y = self._make_data(200, 5)
@@ -270,7 +269,7 @@ class TestGradientBoost:
         assert result.model_name == "GradientBoost_XGBoost"
 
     def test_feature_importance_returns_dataframe(self):
-        from intelligence.models.boosted import GradientBoostModel, GradientBoostConfig
+        from intelligence.models.boosted import GradientBoostConfig, GradientBoostModel
         cfg = GradientBoostConfig(n_estimators=10, early_stopping_rounds=None, calibrate=False)
         model = GradientBoostModel(cfg)
         X, y = self._make_data(200, 5)
@@ -283,7 +282,7 @@ class TestGradientBoost:
         assert len(imp) <= 5
 
     def test_feature_importance_names_mapped(self):
-        from intelligence.models.boosted import GradientBoostModel, GradientBoostConfig
+        from intelligence.models.boosted import GradientBoostConfig, GradientBoostModel
         cfg = GradientBoostConfig(n_estimators=10, early_stopping_rounds=None, calibrate=False)
         model = GradientBoostModel(cfg)
         X, y = self._make_data(200, 5)
@@ -306,7 +305,7 @@ class TestGradientBoost:
             model.feature_importance()
 
     def test_calibration_enabled(self):
-        from intelligence.models.boosted import GradientBoostModel, GradientBoostConfig
+        from intelligence.models.boosted import GradientBoostConfig, GradientBoostModel
         cfg = GradientBoostConfig(n_estimators=10, early_stopping_rounds=None, calibrate=True)
         model = GradientBoostModel(cfg)
         X, y = self._make_data(500, 5)
@@ -317,7 +316,7 @@ class TestGradientBoost:
         np.testing.assert_allclose(proba.sum(axis=1), 1.0, atol=1e-6)
 
     def test_run_id_remains_none_without_registry(self):
-        from intelligence.models.boosted import GradientBoostModel, GradientBoostConfig
+        from intelligence.models.boosted import GradientBoostConfig, GradientBoostModel
         cfg = GradientBoostConfig(n_estimators=10, early_stopping_rounds=None, calibrate=False)
         model = GradientBoostModel(cfg)
         X, y = self._make_data(200, 5)
@@ -325,7 +324,7 @@ class TestGradientBoost:
         assert model.run_id is None
 
     def test_invalid_registry_does_not_crash(self):
-        from intelligence.models.boosted import GradientBoostModel, GradientBoostConfig
+        from intelligence.models.boosted import GradientBoostConfig, GradientBoostModel
         cfg = GradientBoostConfig(n_estimators=10, early_stopping_rounds=None, calibrate=False)
         model = GradientBoostModel(cfg)
         X, y = self._make_data(200, 5)
@@ -333,7 +332,7 @@ class TestGradientBoost:
         assert model.run_id is None
 
     def test_registry_logging_round_trip(self, tmp_path):
-        from intelligence.models.boosted import GradientBoostModel, GradientBoostConfig
+        from intelligence.models.boosted import GradientBoostConfig, GradientBoostModel
         from intelligence.registry.model_registry import ModelRegistry
         cfg = GradientBoostConfig(n_estimators=10, early_stopping_rounds=None, calibrate=False)
         model = GradientBoostModel(cfg)

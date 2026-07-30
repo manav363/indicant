@@ -20,9 +20,9 @@ import logging
 import sqlite3
 import uuid
 from dataclasses import asdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -179,7 +179,7 @@ class ModelRegistry:
 
     # ── Read ────────────────────────────────────────────────────────────────
 
-    def get_run(self, run_id: str) -> Optional[dict[str, Any]]:
+    def get_run(self, run_id: str) -> dict[str, Any] | None:
         """Retrieve a single run by ID, or None if not found."""
         conn = self._connect()
         try:
@@ -192,7 +192,7 @@ class ModelRegistry:
 
     def list_runs(
         self,
-        ticker: Optional[str] = None,
+        ticker: str | None = None,
         limit: int = 20,
     ) -> list[dict[str, Any]]:
         """
@@ -220,7 +220,7 @@ class ModelRegistry:
         self,
         ticker: str,
         metric: str = "oos_sharpe",
-    ) -> Optional[dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         Find the best run for a ticker by a numeric performance metric.
 
@@ -248,7 +248,7 @@ class ModelRegistry:
 
     # ── Utilities ───────────────────────────────────────────────────────────
 
-    def count_runs(self, ticker: Optional[str] = None) -> int:
+    def count_runs(self, ticker: str | None = None) -> int:
         """Total number of runs, optionally filtered by ticker."""
         conn = self._connect()
         try:
@@ -278,13 +278,13 @@ class ModelRegistry:
 
 def _generate_run_id() -> str:
     """Short, sortable run ID: timestamp + 4 random hex chars."""
-    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
+    ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%S")
     suffix = uuid.uuid4().hex[:4]
     return f"{ts}_{suffix}"
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:

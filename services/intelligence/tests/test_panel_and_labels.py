@@ -8,8 +8,6 @@ whole project is measuring anything real.
 
 from __future__ import annotations
 
-from datetime import date, timedelta
-
 import numpy as np
 import pandas as pd
 import pytest

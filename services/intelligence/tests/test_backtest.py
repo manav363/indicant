@@ -343,7 +343,7 @@ class _AlwaysBuyModel:
         y: np.ndarray,
         feature_names: list[str] | None = None,
         **kwargs: object,
-    ) -> "_AlwaysBuyModel":
+    ) -> _AlwaysBuyModel:
         self.is_fitted = True
         return self
 
@@ -384,7 +384,7 @@ class _AlwaysSellModel:
         y: np.ndarray,
         feature_names: list[str] | None = None,
         **kwargs: object,
-    ) -> "_AlwaysSellModel":
+    ) -> _AlwaysSellModel:
         self.is_fitted = True
         return self
 
@@ -430,7 +430,7 @@ class _OscillatingModel:
         y: np.ndarray,
         feature_names: list[str] | None = None,
         **kwargs: object,
-    ) -> "_OscillatingModel":
+    ) -> _OscillatingModel:
         self.is_fitted = True
         return self
 

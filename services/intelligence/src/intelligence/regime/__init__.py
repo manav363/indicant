@@ -17,8 +17,8 @@ from intelligence.regime.classifier import RegimeClassifier, RegimeResult
 from intelligence.regime.market import MarketRegimeResult, RegimeAggregator
 
 __all__ = [
+    "MarketRegimeResult",
+    "RegimeAggregator",
     "RegimeClassifier",
     "RegimeResult",
-    "RegimeAggregator",
-    "MarketRegimeResult",
 ]

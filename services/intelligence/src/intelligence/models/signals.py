@@ -16,7 +16,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
 
 import numpy as np
 
@@ -41,8 +40,8 @@ def generate_signal(
     probability_up: float,
     buy_threshold: float = 0.55,
     sell_threshold: float = 0.45,
-    adx: Optional[float] = None,
-    trend_consistency: Optional[float] = None,
+    adx: float | None = None,
+    trend_consistency: float | None = None,
 ) -> SignalResult:
     """
     Convert a model probability into a structured signal.
@@ -135,7 +134,7 @@ def generate_signal(
 
 def ensemble_signal(
     probabilities: list[float],
-    weights: Optional[list[float]] = None,
+    weights: list[float] | None = None,
     buy_threshold: float = 0.55,
     sell_threshold: float = 0.45,
 ) -> SignalResult:

@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -74,7 +74,7 @@ class LogisticConfig(ModelConfig):
     learning_rate: float = 0.01
     n_epochs: int = 1000
     lambda_l2: float = 0.01
-    batch_size: Optional[int] = None    # None = full batch
+    batch_size: int | None = None    # None = full batch
     tolerance: float = 1e-6
     patience: int = 20
     fit_intercept: bool = True
@@ -109,15 +109,15 @@ class LogisticRegressionScratch(BaseModel):
         b ← b - α * ∂L/∂b
     """
 
-    def __init__(self, config: Optional[LogisticConfig] = None) -> None:
+    def __init__(self, config: LogisticConfig | None = None) -> None:
         self.config = config or LogisticConfig()
-        self.weights: Optional[np.ndarray] = None   # shape: (n_features,)
+        self.weights: np.ndarray | None = None   # shape: (n_features,)
         self.bias: float = 0.0
         self.feature_names: list[str] = []
         self.loss_history: list[float] = []
         self.is_fitted: bool = False
-        self._scaler_mean: Optional[np.ndarray] = None
-        self._scaler_std: Optional[np.ndarray] = None
+        self._scaler_mean: np.ndarray | None = None
+        self._scaler_std: np.ndarray | None = None
 
     # ── Core math ─────────────────────────────────────────────────────────
 
@@ -221,10 +221,10 @@ class LogisticRegressionScratch(BaseModel):
         self,
         X: np.ndarray,
         y: np.ndarray,
-        feature_names: Optional[list[str]] = None,
-        registry: Optional[Any] = None,
-        metadata: Optional[dict[str, Any]] = None,
-    ) -> "LogisticRegressionScratch":
+        feature_names: list[str] | None = None,
+        registry: Any | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> LogisticRegressionScratch:
         """
         Train the model using gradient descent.
 
@@ -377,7 +377,7 @@ class LogisticRegressionScratch(BaseModel):
         self,
         X_df: pd.DataFrame,
         y: pd.Series,
-    ) -> "LogisticRegressionScratch":
+    ) -> LogisticRegressionScratch:
         """Fit from DataFrame (convenience wrapper)."""
         return self.fit(
             X_df.values,
