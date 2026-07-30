@@ -175,3 +175,42 @@ class HealthResponse(BaseModel):
     status: str
     version: str
     model_loaded: bool
+
+
+# ── Regime Detection ─────────────────────────────────────────────────────────
+
+class RegimeHistoryPoint(BaseModel):
+    date: str
+    regime: str              # "Bull" | "Bear" | "RangeBound"
+
+
+class RegimeResponse(BaseModel):
+    ticker: str
+    analysis_date: str
+    primary_regime: str      # "Bull" | "Bear" | "RangeBound"
+    regime_confidence: float  # 0..1
+    trend_direction: str     # "up" | "down" | "sideways"
+    volatility_regime: str   # "low" | "normal" | "high"
+    drawdown_regime: str     # "peak" | "normal" | "correction" | "bear"
+    adx: Optional[float] = None
+    composite_signal: str    # "risk_on" | "risk_off" | "neutral"
+    regime_history: list[RegimeHistoryPoint]
+
+
+class MarketRegimeDetail(BaseModel):
+    ticker: str
+    primary_regime: str
+    regime_confidence: float
+    adx: Optional[float] = None
+    composite_signal: str
+
+
+class MarketRegimeResponse(BaseModel):
+    analysis_date: str
+    total_constituents: int
+    constituents_reporting: int
+    primary_regime: str
+    regime_distribution: dict[str, int]
+    market_adx: Optional[float] = None
+    composite_signal: str
+    details: list[MarketRegimeDetail]

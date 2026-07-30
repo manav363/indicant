@@ -3,62 +3,21 @@ market_regime/models/gradient_boost.py
 ────────────────────────────────────────
 Gradient Boosting model using XGBoost.
 
-This is the "enhance with libraries" step — after understanding the
-math via logistic regression, we use XGBoost for production because:
-- Handles non-linear relationships automatically
-- Built-in feature importance (gain, cover, frequency)
-- Regularisation (L1 + L2) built in
-- Handles missing values natively
-- Orders of magnitude faster than our scratch implementations
-
-The math behind gradient boosting:
-───────────────────────────────────
-Gradient boosting builds an ensemble of weak learners (decision trees)
-sequentially. Each tree corrects the errors of the previous ones.
-
-Mathematically:
-    F_0(x) = initial prediction (e.g. log-odds of base rate)
-
-    For m = 1 to M:
-        1. Compute pseudo-residuals (negative gradient of loss):
-           r_i = -∂L(y_i, F_{m-1}(x_i)) / ∂F_{m-1}(x_i)
-
-           For log-loss: r_i = y_i - σ(F_{m-1}(x_i))
-           = actual - predicted probability
-           (This is the same gradient as in logistic regression!)
-
-        2. Fit a decision tree h_m(x) to the residuals r
-
-        3. Update: F_m(x) = F_{m-1}(x) + η * h_m(x)
-           where η (learning_rate) shrinks each tree's contribution.
-           Lower η = more trees needed but better generalisation.
-
-    Final prediction: F_M(x) → sigmoid → P(Y=1)
-
-Why this works:
-    Each tree focuses on the samples the previous model got wrong.
-    It's gradient descent in function space rather than parameter space.
-    The result is a powerful non-linear model that can capture
-    complex interactions between features (e.g. high RSI + low volume
-    → weak signal, but high RSI + high OBV → strong signal).
-
-XGBoost improvements over vanilla GBM:
-    - Second-order gradients (Newton's method, not just gradient)
-    - Column subsampling (like Random Forest — reduces correlation)
-    - L1 (alpha) + L2 (lambda) regularisation on tree weights
-    - Sparsity-aware split finding (handles NaN natively)
-    - Parallel tree construction
+See PLAN.md Section 2 for model registry integration:
+- After fit(), logs the training run to the registry if a ModelRegistry
+  instance is provided.
 """
 
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Optional
 
 import numpy as np
 import pandas as pd
 import xgboost as xgb
+from sklearn.model_selection import train_test_split
 
 from market_regime.models.base import BaseModel, ModelConfig, PredictionResult
 
@@ -131,6 +90,7 @@ class GradientBoostModel(BaseModel):
         self._calibrated = False
         self.feature_names: list[str] = []
         self.is_fitted: bool = False
+        self.run_id: Optional[str] = None       # model registry run ID, set after fit()
 
     def fit(
         self,
@@ -139,6 +99,8 @@ class GradientBoostModel(BaseModel):
         feature_names: Optional[list[str]] = None,
         X_val: Optional[np.ndarray] = None,
         y_val: Optional[np.ndarray] = None,
+        registry: Optional[Any] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> "GradientBoostModel":
         """
         Train XGBoost model.
@@ -149,15 +111,31 @@ class GradientBoostModel(BaseModel):
         feature_names : list of feature names for importance plots
         X_val, y_val : optional validation set for early stopping.
             If not provided, uses 20% of training data.
+        registry : ModelRegistry, optional
+            If provided, logs this training run after fit completes.
+        metadata : dict, optional
+            Run metadata for the registry (ticker, data_start, data_end, etc.).
+            Required if `registry` is provided.
         """
         cfg = self.config
         self.feature_names = feature_names or [f"f{i}" for i in range(X.shape[1])]
 
-        # Split validation set for early stopping if not provided
+        # Split validation set for early stopping if not provided.
+        # Uses stratified split to ensure both classes are represented in the
+        # validation set — the sequential 20% tail can concentrate in a single
+        # regime and contain only one class, which breaks XGBoost's eval set.
         if X_val is None:
-            split = int(len(X) * 0.8)
-            X_train, X_val = X[:split], X[split:]
-            y_train, y_val = y[:split], y[split:]
+            try:
+                X_train, X_val, y_train, y_val = train_test_split(
+                    X, y, test_size=0.2, random_state=cfg.random_state,
+                    stratify=y,
+                )
+            except ValueError:
+                # Too few samples of one class for stratification; fall back
+                # to sequential split and disable early stopping below.
+                split = int(len(X) * 0.8)
+                X_train, X_val = X[:split], X[split:]
+                y_train, y_val = y[:split], y[split:]
         else:
             X_train, y_train = X, y
 
@@ -192,22 +170,27 @@ class GradientBoostModel(BaseModel):
             len(X_train), len(X_val), X.shape[1], y_train.mean() * 100
         )
 
-        self.model.fit(
-            X_train, y_train,
-            eval_set=[(X_val, y_val)],
-            verbose=False,
-        )
-
-        actual_trees = self.model.best_iteration + 1 if hasattr(self.model, 'best_iteration') else cfg.n_estimators
+        # In rare cases (e.g. shuffled labels during permutation tests), the
+        # validation split may contain only one class. XGBoost requires both
+        # classes in the eval set — fall back to training without early stopping.
+        if len(np.unique(y_val)) < 2:
+            logger.warning(
+                "Validation set has only one class (%s) — "
+                "training without early stopping.",
+                np.unique(y_val),
+            )
+            self.model.fit(X_train, y_train, verbose=False)
+            actual_trees = cfg.n_estimators
+        else:
+            self.model.fit(
+                X_train, y_train,
+                eval_set=[(X_val, y_val)],
+                verbose=False,
+            )
+            actual_trees = self.model.best_iteration + 1 if hasattr(self.model, 'best_iteration') else cfg.n_estimators
         logger.info("XGBoost trained: %d trees used (early stopping).", actual_trees)
 
         # ── Probability calibration ────────────────────────────────────────
-        # XGBoost is often overconfident or underconfident in its probabilities.
-        # Platt scaling fits a sigmoid on top of the raw scores using
-        # cross-validation, mapping them to better-calibrated probabilities.
-        #
-        # After calibration:
-        # When model says P=0.7, it should be right ~70% of the time.
         if cfg.calibrate:
             logger.info("Calibrating probabilities with Platt scaling...")
             from sklearn.linear_model import LogisticRegression as _LR
@@ -218,6 +201,28 @@ class GradientBoostModel(BaseModel):
             logger.info("Calibration complete.")
 
         self.is_fitted = True
+
+        # ── Model registry logging ─────────────────────────────────────────
+        if registry is not None:
+            from market_regime.registry.model_registry import ModelRegistry as _Reg
+            if not isinstance(registry, _Reg):
+                logger.warning("fit() called with invalid registry instance — skipping log.")
+            else:
+                run_meta = {
+                    "ticker": (metadata or {}).get("ticker", ""),
+                    "model_type": "gradient_boost",
+                    "model_config": cfg,
+                    "data_start": (metadata or {}).get("data_start", ""),
+                    "data_end": (metadata or {}).get("data_end", ""),
+                    "n_samples": len(X),
+                    "n_features": X.shape[1],
+                    "horizon_days": (metadata or {}).get("horizon_days", 126),
+                    "label_threshold": (metadata or {}).get("label_threshold", 0.0),
+                    "feature_list": self.feature_names,
+                }
+                self.run_id = registry.log_run(run_meta)
+                logger.info("Logged run %s to model registry.", self.run_id)
+
         return self
 
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
@@ -243,7 +248,7 @@ class GradientBoostModel(BaseModel):
         signal = "BUY" if p_up >= threshold else "HOLD"
 
         importances = self.feature_importance()
-        imp_dict = dict(zip(importances["feature"], importances["importance"]))
+        imp_dict = dict(zip(importances["feature"], importances["importance"], strict=False))
 
         return PredictionResult(
             ticker="",

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Loader2, TrendingUp, TrendingDown, Minus, AlertCircle, RefreshCw } from 'lucide-react'
 import { getUniverse } from '../api/client.js'
@@ -35,7 +35,7 @@ export default function Universe() {
   const [index, setIndex] = useState('NIFTY50')
   const navigate = useNavigate()
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
@@ -46,9 +46,9 @@ export default function Universe() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [index])
 
-  useEffect(() => { load() }, [index])
+  useEffect(() => { load() }, [load])
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 animate-fade-in">

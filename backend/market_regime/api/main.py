@@ -22,7 +22,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from market_regime.api.routes import prediction, stocks, universe
+from market_regime.api.routes import prediction, regime, stocks, universe
 from market_regime.api.schemas import HealthResponse
 
 # ── Logging setup ─────────────────────────────────────────────────────────────
@@ -95,6 +95,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 # ── Routers ───────────────────────────────────────────────────────────────────
 app.include_router(stocks.router)
 app.include_router(prediction.router)
+app.include_router(regime.router)
 app.include_router(universe.router)
 
 # ── Health check ──────────────────────────────────────────────────────────────

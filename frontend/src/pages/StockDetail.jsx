@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, RefreshCw, Loader2, AlertCircle } from 'lucide-react'
-import { getPrediction, getPriceHistory } from '../api/client.js'
+import { getPrediction, getPriceHistory, getStockRegime } from '../api/client.js'
 import PredictionCard from '../components/PredictionCard.jsx'
 import PriceChart from '../components/PriceChart.jsx'
 import FeaturePanel from '../components/FeaturePanel.jsx'
 import RiskMetrics from '../components/RiskMetrics.jsx'
+import RegimePanel from '../components/RegimePanel.jsx'
 
 export default function StockDetail() {
   const { ticker } = useParams()
@@ -13,12 +14,14 @@ export default function StockDetail() {
 
   const [prediction, setPrediction] = useState(null)
   const [history, setHistory] = useState(null)
+  const [regime, setRegime] = useState(null)
+  const [regimeLoading, setRegimeLoading] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [horizon, setHorizon] = useState(6)
   const [model, setModel] = useState('gradient_boost')
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
@@ -33,9 +36,20 @@ export default function StockDetail() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [horizon, model, ticker])
 
-  useEffect(() => { load() }, [ticker, horizon, model])
+  // Regime fetched independently (lighter endpoint, no db writes)
+  useEffect(() => {
+    let cancelled = false
+    setRegimeLoading(true)
+    getStockRegime(ticker)
+      .then(data => { if (!cancelled) setRegime(data) })
+      .catch(() => {})  // regime is non-critical — fail silently
+      .finally(() => { if (!cancelled) setRegimeLoading(false) })
+    return () => { cancelled = true }
+  }, [ticker])
+
+  useEffect(() => { load() }, [load])
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 animate-fade-in">
@@ -105,11 +119,12 @@ export default function StockDetail() {
           <div className="lg:col-span-1 space-y-6">
             <PredictionCard prediction={prediction} />
             <RiskMetrics prediction={prediction} />
+            <RegimePanel regime={regime} loading={regimeLoading} />
           </div>
 
           {/* Right column */}
           <div className="lg:col-span-2 space-y-6">
-            {history && <PriceChart data={history.data} indicators={prediction.indicators} />}
+            {history && <PriceChart data={history.data} />}
             <FeaturePanel indicators={prediction.indicators} />
             <TopFeatures features={prediction.top_features} />
           </div>

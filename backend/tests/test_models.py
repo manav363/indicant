@@ -196,3 +196,155 @@ class TestKellyCriterion:
     def test_max_position_cap(self):
         result = recommended_position("TEST.NS", p_win=0.99, max_position=0.10)
         assert result.recommended_fraction <= 0.10
+
+
+# ── Gradient Boost tests ────────────────────────────────────────────────────────
+
+class TestGradientBoost:
+    def _make_data(self, n_samples=200, n_features=5):
+        np.random.seed(42)
+        X = np.random.randn(n_samples, n_features)
+        # Linearly separable (y=1 if first feature > 0)
+        y = (X[:, 0] > 0).astype(float)
+        return X, y
+
+    def test_fit_runs(self):
+        from market_regime.models.gradient_boost import GradientBoostModel, GradientBoostConfig
+        cfg = GradientBoostConfig(n_estimators=10, early_stopping_rounds=None, calibrate=False)
+        model = GradientBoostModel(cfg)
+        X, y = self._make_data(200, 5)
+        model.fit(X, y)
+        assert model.is_fitted
+        assert model.model is not None
+
+    def test_predict_proba_shape(self):
+        from market_regime.models.gradient_boost import GradientBoostModel, GradientBoostConfig
+        cfg = GradientBoostConfig(n_estimators=10, early_stopping_rounds=None, calibrate=False)
+        model = GradientBoostModel(cfg)
+        X, y = self._make_data(200, 5)
+        model.fit(X, y)
+        proba = model.predict_proba(X)
+        assert proba.shape == (len(X), 2)
+
+    def test_predict_proba_sums_to_one(self):
+        from market_regime.models.gradient_boost import GradientBoostModel, GradientBoostConfig
+        cfg = GradientBoostConfig(n_estimators=10, early_stopping_rounds=None, calibrate=False)
+        model = GradientBoostModel(cfg)
+        X, y = self._make_data(200, 5)
+        model.fit(X, y)
+        proba = model.predict_proba(X)
+        np.testing.assert_allclose(proba.sum(axis=1), 1.0, atol=1e-6)
+
+    def test_predict_returns_binary(self):
+        from market_regime.models.gradient_boost import GradientBoostModel, GradientBoostConfig
+        cfg = GradientBoostConfig(n_estimators=10, early_stopping_rounds=None, calibrate=False)
+        model = GradientBoostModel(cfg)
+        X, y = self._make_data(200, 5)
+        model.fit(X, y)
+        preds = model.predict(X)
+        assert set(np.unique(preds)).issubset({0, 1})
+
+    def test_learns_separable_data(self):
+        from market_regime.models.gradient_boost import GradientBoostModel, GradientBoostConfig
+        cfg = GradientBoostConfig(n_estimators=20, early_stopping_rounds=None, calibrate=False)
+        model = GradientBoostModel(cfg)
+        X, y = self._make_data(500, 5)
+        model.fit(X, y)
+        preds = model.predict(X)
+        accuracy = (preds == y).mean()
+        assert accuracy > 0.80
+
+    def test_predict_df_returns_prediction_result(self):
+        from market_regime.models.gradient_boost import GradientBoostModel, GradientBoostConfig
+        cfg = GradientBoostConfig(n_estimators=10, early_stopping_rounds=None, calibrate=False)
+        model = GradientBoostModel(cfg)
+        X, y = self._make_data(200, 5)
+        model.fit(X, y)
+        feature_names = [f"feat_{i}" for i in range(5)]
+        X_df = pd.DataFrame(X, columns=feature_names)
+        result = model.predict_df(X_df)
+        assert isinstance(result, PredictionResult)
+        assert result.signal in ("BUY", "HOLD")
+        assert 0.5 <= result.confidence <= 1.0
+        assert 0.0 <= result.probability_up <= 1.0
+        assert result.model_name == "GradientBoost_XGBoost"
+
+    def test_feature_importance_returns_dataframe(self):
+        from market_regime.models.gradient_boost import GradientBoostModel, GradientBoostConfig
+        cfg = GradientBoostConfig(n_estimators=10, early_stopping_rounds=None, calibrate=False)
+        model = GradientBoostModel(cfg)
+        X, y = self._make_data(200, 5)
+        feature_names = [f"feat_{i}" for i in range(5)]
+        model.fit(X, y, feature_names=feature_names)
+        imp = model.feature_importance(top_n=5)
+        assert isinstance(imp, pd.DataFrame)
+        assert "feature" in imp.columns
+        assert "importance" in imp.columns
+        assert len(imp) <= 5
+
+    def test_feature_importance_names_mapped(self):
+        from market_regime.models.gradient_boost import GradientBoostModel, GradientBoostConfig
+        cfg = GradientBoostConfig(n_estimators=10, early_stopping_rounds=None, calibrate=False)
+        model = GradientBoostModel(cfg)
+        X, y = self._make_data(200, 5)
+        feature_names = [f"feat_{i}" for i in range(5)]
+        model.fit(X, y, feature_names=feature_names)
+        imp = model.feature_importance(top_n=5)
+        for feat in imp["feature"]:
+            assert feat.startswith("feat_")
+
+    def test_not_fitted_raises(self):
+        from market_regime.models.gradient_boost import GradientBoostModel
+        model = GradientBoostModel()
+        with pytest.raises(RuntimeError, match="not fitted"):
+            model.predict_proba(np.random.randn(10, 5))
+
+    def test_not_fitted_importance_raises(self):
+        from market_regime.models.gradient_boost import GradientBoostModel
+        model = GradientBoostModel()
+        with pytest.raises(RuntimeError, match="not fitted"):
+            model.feature_importance()
+
+    def test_calibration_enabled(self):
+        from market_regime.models.gradient_boost import GradientBoostModel, GradientBoostConfig
+        cfg = GradientBoostConfig(n_estimators=10, early_stopping_rounds=None, calibrate=True)
+        model = GradientBoostModel(cfg)
+        X, y = self._make_data(500, 5)
+        model.fit(X, y)
+        assert model._calibrated
+        proba = model.predict_proba(X)
+        assert proba.shape == (len(X), 2)
+        np.testing.assert_allclose(proba.sum(axis=1), 1.0, atol=1e-6)
+
+    def test_run_id_remains_none_without_registry(self):
+        from market_regime.models.gradient_boost import GradientBoostModel, GradientBoostConfig
+        cfg = GradientBoostConfig(n_estimators=10, early_stopping_rounds=None, calibrate=False)
+        model = GradientBoostModel(cfg)
+        X, y = self._make_data(200, 5)
+        model.fit(X, y)
+        assert model.run_id is None
+
+    def test_invalid_registry_does_not_crash(self):
+        from market_regime.models.gradient_boost import GradientBoostModel, GradientBoostConfig
+        cfg = GradientBoostConfig(n_estimators=10, early_stopping_rounds=None, calibrate=False)
+        model = GradientBoostModel(cfg)
+        X, y = self._make_data(200, 5)
+        model.fit(X, y, registry="not_a_registry")
+        assert model.run_id is None
+
+    def test_registry_logging_round_trip(self, tmp_path):
+        from market_regime.models.gradient_boost import GradientBoostModel, GradientBoostConfig
+        from market_regime.registry.model_registry import ModelRegistry
+        cfg = GradientBoostConfig(n_estimators=10, early_stopping_rounds=None, calibrate=False)
+        model = GradientBoostModel(cfg)
+        X, y = self._make_data(200, 5)
+        db_path = tmp_path / "test_registry.db"
+        registry = ModelRegistry(db_path=str(db_path))
+        registry.create_tables()
+        metadata = {"ticker": "TEST", "data_start": "2020-01-01", "data_end": "2025-01-01"}
+        model.fit(X, y, registry=registry, metadata=metadata)
+        assert model.run_id is not None
+        run = registry.get_run(model.run_id)
+        assert run is not None
+        assert run["ticker"] == "TEST"
+        assert run["model_type"] == "gradient_boost"

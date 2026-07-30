@@ -2,6 +2,7 @@ import { Routes, Route } from 'react-router-dom'
 import Home from './pages/Home.jsx'
 import StockDetail from './pages/StockDetail.jsx'
 import Universe from './pages/Universe.jsx'
+import NotFound from './pages/NotFound.jsx'
 import Navbar from './components/Navbar.jsx'
 
 export default function App() {
@@ -13,6 +14,7 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/stock/:ticker" element={<StockDetail />} />
           <Route path="/universe" element={<Universe />} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
     </div>

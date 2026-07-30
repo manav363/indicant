@@ -1,0 +1,1684 @@
+{
+  "adjusted_extra_columns": [
+    "adj_factor",
+    "adj_close"
+  ],
+  "canonical_price_columns": [
+    "date",
+    "symbol",
+    "series",
+    "open",
+    "high",
+    "low",
+    "close",
+    "prev_close",
+    "volume",
+    "turnover",
+    "trades",
+    "delivery_qty",
+    "delivery_pct",
+    "isin"
+  ],
+  "lake_layout": {
+    "ADJUSTED": {
+      "dir": "adjusted",
+      "file": "/L/adjusted/year=2020/adjusted_2020.parquet",
+      "glob": "/L/adjusted/**/*.parquet"
+    },
+    "CALENDAR": {
+      "dir": "calendar",
+      "file": "/L/calendar/data.parquet",
+      "glob": "/L/calendar/**/*.parquet"
+    },
+    "CORP_ACTIONS": {
+      "dir": "corp_actions",
+      "file": "/L/corp_actions/data.parquet",
+      "glob": "/L/corp_actions/**/*.parquet"
+    },
+    "PRICES": {
+      "dir": "prices",
+      "file": "/L/prices/year=2020/prices_2020.parquet",
+      "glob": "/L/prices/**/*.parquet"
+    },
+    "QUALITY_RUNS": {
+      "dir": "quality/runs",
+      "file": "/L/quality/runs/date=2020-06-15/data.parquet",
+      "glob": "/L/quality/runs/**/*.parquet"
+    },
+    "QUALITY_SCORES": {
+      "dir": "quality/scores",
+      "file": "/L/quality/scores/data.parquet",
+      "glob": "/L/quality/scores/**/*.parquet"
+    },
+    "QUARANTINE": {
+      "dir": "quality/quarantine",
+      "file": "/L/quality/quarantine/date=2020-06-15/data.parquet",
+      "glob": "/L/quality/quarantine/**/*.parquet"
+    },
+    "SYMBOL_CHANGES": {
+      "dir": "symbol_changes",
+      "file": "/L/symbol_changes/data.parquet",
+      "glob": "/L/symbol_changes/**/*.parquet"
+    },
+    "SYMBOL_META": {
+      "dir": "symbol_meta",
+      "file": "/L/symbol_meta/data.parquet",
+      "glob": "/L/symbol_meta/**/*.parquet"
+    },
+    "UNIVERSE_PIT": {
+      "dir": "universe_pit",
+      "file": "/L/universe_pit/date=2020-06-15/data.parquet",
+      "glob": "/L/universe_pit/**/*.parquet"
+    }
+  },
+  "models": {
+    "CalibrationBin": {
+      "additionalProperties": false,
+      "description": "One bucket of a reliability diagram. Perfect calibration is the\ndiagonal: mean_predicted == observed_rate in every bin.",
+      "properties": {
+        "bin_lower": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Bin Lower",
+          "type": "number"
+        },
+        "bin_upper": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Bin Upper",
+          "type": "number"
+        },
+        "count": {
+          "minimum": 0,
+          "title": "Count",
+          "type": "integer"
+        },
+        "mean_predicted": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Mean Predicted",
+          "type": "number"
+        },
+        "observed_rate": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Observed Rate",
+          "type": "number"
+        }
+      },
+      "required": [
+        "bin_lower",
+        "bin_upper",
+        "mean_predicted",
+        "observed_rate",
+        "count"
+      ],
+      "title": "CalibrationBin",
+      "type": "object"
+    },
+    "CorporateAction": {
+      "$defs": {
+        "CorporateActionType": {
+          "enum": [
+            "split",
+            "bonus",
+            "dividend",
+            "rights",
+            "merger",
+            "demerger",
+            "symbol_change",
+            "delisting",
+            "other"
+          ],
+          "title": "CorporateActionType",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "description": "A corporate action with its price-adjustment ratio.\n\n`ratio` is the multiplicative factor applied to pre-event prices to make\nthem comparable with post-event prices. A 1:2 split has ratio 0.5 \u2014 every\nprice before the ex-date is halved.",
+      "properties": {
+        "action_type": {
+          "$ref": "#/$defs/CorporateActionType"
+        },
+        "ex_date": {
+          "format": "date",
+          "title": "Ex Date",
+          "type": "string"
+        },
+        "ratio": {
+          "default": 1.0,
+          "exclusiveMinimum": 0,
+          "title": "Ratio",
+          "type": "number"
+        },
+        "raw_text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Raw Text"
+        },
+        "symbol": {
+          "title": "Symbol",
+          "type": "string"
+        }
+      },
+      "required": [
+        "symbol",
+        "action_type",
+        "ex_date"
+      ],
+      "title": "CorporateAction",
+      "type": "object"
+    },
+    "EligibilityThresholds": {
+      "additionalProperties": false,
+      "description": "The bar a symbol must clear to be offered to a user.\n\nAnything below the bar is not a failure and not a fallback \u2014 it is\ncorrectly out of scope, and the UI says so in plain words.",
+      "properties": {
+        "min_history_days": {
+          "default": 756,
+          "minimum": 1,
+          "title": "Min History Days",
+          "type": "integer"
+        },
+        "min_median_turnover": {
+          "default": 10000000.0,
+          "minimum": 0,
+          "title": "Min Median Turnover",
+          "type": "number"
+        },
+        "min_recency": {
+          "default": 0.5,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Min Recency",
+          "type": "number"
+        },
+        "min_score": {
+          "default": 0.85,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Min Score",
+          "type": "number"
+        }
+      },
+      "title": "EligibilityThresholds",
+      "type": "object"
+    },
+    "ErrorEnvelope": {
+      "$defs": {
+        "ErrorCode": {
+          "enum": [
+            "symbol_not_found",
+            "symbol_not_eligible",
+            "invalid_request",
+            "not_a_trading_day",
+            "data_unavailable",
+            "insufficient_history",
+            "upstream_unavailable",
+            "model_not_trained",
+            "model_refused",
+            "internal"
+          ],
+          "title": "ErrorCode",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "description": "`user_message` is what a person reads; `message` is what an engineer\nreads. Keeping them separate stops internal detail leaking into the UI and\nstops the UI's phrasing being the only record of what broke.",
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/ErrorCode"
+        },
+        "detail": {
+          "additionalProperties": true,
+          "title": "Detail",
+          "type": "object"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "user_message": {
+          "title": "User Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "user_message"
+      ],
+      "title": "ErrorEnvelope",
+      "type": "object"
+    },
+    "ExplanationFact": {
+      "$defs": {
+        "Direction": {
+          "enum": [
+            "supports_up",
+            "supports_down",
+            "neutral"
+          ],
+          "title": "Direction",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "description": "One SHAP contribution, ready for templating. No prose.\n\n`display_name` and `display_value` exist so the gateway never has to know\nthat `momentum_roc_6m` means \"6-month price change\" \u2014 that mapping lives\nwith the feature that defines it.",
+      "properties": {
+        "direction": {
+          "$ref": "#/$defs/Direction"
+        },
+        "display_name": {
+          "title": "Display Name",
+          "type": "string"
+        },
+        "display_value": {
+          "title": "Display Value",
+          "type": "string"
+        },
+        "feature": {
+          "title": "Feature",
+          "type": "string"
+        },
+        "rank": {
+          "minimum": 1,
+          "title": "Rank",
+          "type": "integer"
+        },
+        "shap": {
+          "title": "Shap",
+          "type": "number"
+        },
+        "value": {
+          "title": "Value",
+          "type": "number"
+        }
+      },
+      "required": [
+        "feature",
+        "display_name",
+        "value",
+        "display_value",
+        "shap",
+        "direction",
+        "rank"
+      ],
+      "title": "ExplanationFact",
+      "type": "object"
+    },
+    "LakePaths": {
+      "additionalProperties": false,
+      "description": "Resolves dataset paths under a lake root.\n\nDeliberately does no IO \u2014 it is a pure path calculator so both services\ncan agree on layout without either importing storage code.",
+      "properties": {
+        "root": {
+          "format": "path",
+          "title": "Root",
+          "type": "string"
+        }
+      },
+      "required": [
+        "root"
+      ],
+      "title": "LakePaths",
+      "type": "object"
+    },
+    "MarketRegimeResult": {
+      "$defs": {
+        "CompositeSignal": {
+          "enum": [
+            "risk_on",
+            "risk_off",
+            "neutral"
+          ],
+          "title": "CompositeSignal",
+          "type": "string"
+        },
+        "PrimaryRegime": {
+          "enum": [
+            "bull",
+            "bear",
+            "ranging"
+          ],
+          "title": "PrimaryRegime",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "as_of": {
+          "format": "date",
+          "title": "As Of",
+          "type": "string"
+        },
+        "cache_ttl_minutes": {
+          "minimum": 0,
+          "title": "Cache Ttl Minutes",
+          "type": "integer"
+        },
+        "composite_signal": {
+          "$ref": "#/$defs/CompositeSignal"
+        },
+        "constituents_reporting": {
+          "minimum": 0,
+          "title": "Constituents Reporting",
+          "type": "integer"
+        },
+        "majority_regime": {
+          "$ref": "#/$defs/PrimaryRegime"
+        },
+        "median_adx": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Median Adx"
+        },
+        "regime_distribution": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "title": "Regime Distribution",
+          "type": "object"
+        },
+        "total_constituents": {
+          "minimum": 0,
+          "title": "Total Constituents",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "as_of",
+        "majority_regime",
+        "composite_signal",
+        "regime_distribution",
+        "constituents_reporting",
+        "total_constituents",
+        "cache_ttl_minutes"
+      ],
+      "title": "MarketRegimeResult",
+      "type": "object"
+    },
+    "ModelCard": {
+      "$defs": {
+        "CalibrationBin": {
+          "additionalProperties": false,
+          "description": "One bucket of a reliability diagram. Perfect calibration is the\ndiagonal: mean_predicted == observed_rate in every bin.",
+          "properties": {
+            "bin_lower": {
+              "maximum": 1,
+              "minimum": 0,
+              "title": "Bin Lower",
+              "type": "number"
+            },
+            "bin_upper": {
+              "maximum": 1,
+              "minimum": 0,
+              "title": "Bin Upper",
+              "type": "number"
+            },
+            "count": {
+              "minimum": 0,
+              "title": "Count",
+              "type": "integer"
+            },
+            "mean_predicted": {
+              "maximum": 1,
+              "minimum": 0,
+              "title": "Mean Predicted",
+              "type": "number"
+            },
+            "observed_rate": {
+              "maximum": 1,
+              "minimum": 0,
+              "title": "Observed Rate",
+              "type": "number"
+            }
+          },
+          "required": [
+            "bin_lower",
+            "bin_upper",
+            "mean_predicted",
+            "observed_rate",
+            "count"
+          ],
+          "title": "CalibrationBin",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "description": "What the /model page renders. Every field here is evidence, not a claim.\n\n`permutation_p_value` and `deflated_sharpe` are present specifically so a\nnull result is a first-class, publishable output rather than something\nburied.",
+      "properties": {
+        "accuracy": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Accuracy"
+        },
+        "baseline_model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Baseline Model"
+        },
+        "baseline_oos_sharpe": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Baseline Oos Sharpe"
+        },
+        "brier_score": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Brier Score"
+        },
+        "calibration": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/CalibrationBin"
+          },
+          "title": "Calibration",
+          "type": "array"
+        },
+        "cost_adjusted_sharpe": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cost Adjusted Sharpe"
+        },
+        "cpcv_sharpe_mean": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cpcv Sharpe Mean"
+        },
+        "cpcv_sharpe_std": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cpcv Sharpe Std"
+        },
+        "deflated_sharpe": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Deflated Sharpe"
+        },
+        "model_type": {
+          "title": "Model Type",
+          "type": "string"
+        },
+        "n_features": {
+          "minimum": 0,
+          "title": "N Features",
+          "type": "integer"
+        },
+        "n_permutations": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "N Permutations"
+        },
+        "n_train_samples": {
+          "minimum": 0,
+          "title": "N Train Samples",
+          "type": "integer"
+        },
+        "oos_max_drawdown": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Oos Max Drawdown"
+        },
+        "oos_sharpe": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Oos Sharpe"
+        },
+        "oos_sortino": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Oos Sortino"
+        },
+        "permutation_p_value": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Permutation P Value"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "train_end": {
+          "format": "date",
+          "title": "Train End",
+          "type": "string"
+        },
+        "train_start": {
+          "format": "date",
+          "title": "Train Start",
+          "type": "string"
+        },
+        "trained_at": {
+          "format": "date-time",
+          "title": "Trained At",
+          "type": "string"
+        },
+        "universe_size": {
+          "minimum": 0,
+          "title": "Universe Size",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "run_id",
+        "trained_at",
+        "model_type",
+        "n_train_samples",
+        "n_features",
+        "universe_size",
+        "train_start",
+        "train_end"
+      ],
+      "title": "ModelCard",
+      "type": "object"
+    },
+    "OHLCVBar": {
+      "$defs": {
+        "Series": {
+          "description": "NSE equity series. EQ is the rolling-settlement equity series we model.\n\nBE/BZ are trade-for-trade (surveillance) series; SM/ST are SME platform.\nWe keep them ingested but they are excluded from the eligible universe.",
+          "enum": [
+            "EQ",
+            "BE",
+            "BZ",
+            "SM",
+            "ST",
+            "OTHER"
+          ],
+          "title": "Series",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "description": "One security, one trading day. Mirrors CANONICAL_PRICE_COLUMNS.\n\nValidity invariants (high >= low, high >= max(open, close), etc.) are\nenforced here so a malformed bar cannot be constructed in the first place.\nThe quality gate re-checks them at the dataframe level because bulk\ningestion never round-trips through this model.",
+      "properties": {
+        "close": {
+          "exclusiveMinimum": 0,
+          "title": "Close",
+          "type": "number"
+        },
+        "date": {
+          "format": "date",
+          "title": "Date",
+          "type": "string"
+        },
+        "delivery_pct": {
+          "anyOf": [
+            {
+              "maximum": 100,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Delivery Pct"
+        },
+        "delivery_qty": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Delivery Qty"
+        },
+        "high": {
+          "exclusiveMinimum": 0,
+          "title": "High",
+          "type": "number"
+        },
+        "isin": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Isin"
+        },
+        "low": {
+          "exclusiveMinimum": 0,
+          "title": "Low",
+          "type": "number"
+        },
+        "open": {
+          "exclusiveMinimum": 0,
+          "title": "Open",
+          "type": "number"
+        },
+        "prev_close": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Prev Close"
+        },
+        "series": {
+          "$ref": "#/$defs/Series",
+          "default": "EQ"
+        },
+        "symbol": {
+          "maxLength": 32,
+          "minLength": 1,
+          "title": "Symbol",
+          "type": "string"
+        },
+        "trades": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Trades"
+        },
+        "turnover": {
+          "minimum": 0,
+          "title": "Turnover",
+          "type": "number"
+        },
+        "volume": {
+          "minimum": 0,
+          "title": "Volume",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "date",
+        "symbol",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "turnover"
+      ],
+      "title": "OHLCVBar",
+      "type": "object"
+    },
+    "Prediction": {
+      "$defs": {
+        "Direction": {
+          "enum": [
+            "supports_up",
+            "supports_down",
+            "neutral"
+          ],
+          "title": "Direction",
+          "type": "string"
+        },
+        "ExplanationFact": {
+          "additionalProperties": false,
+          "description": "One SHAP contribution, ready for templating. No prose.\n\n`display_name` and `display_value` exist so the gateway never has to know\nthat `momentum_roc_6m` means \"6-month price change\" \u2014 that mapping lives\nwith the feature that defines it.",
+          "properties": {
+            "direction": {
+              "$ref": "#/$defs/Direction"
+            },
+            "display_name": {
+              "title": "Display Name",
+              "type": "string"
+            },
+            "display_value": {
+              "title": "Display Value",
+              "type": "string"
+            },
+            "feature": {
+              "title": "Feature",
+              "type": "string"
+            },
+            "rank": {
+              "minimum": 1,
+              "title": "Rank",
+              "type": "integer"
+            },
+            "shap": {
+              "title": "Shap",
+              "type": "number"
+            },
+            "value": {
+              "title": "Value",
+              "type": "number"
+            }
+          },
+          "required": [
+            "feature",
+            "display_name",
+            "value",
+            "display_value",
+            "shap",
+            "direction",
+            "rank"
+          ],
+          "title": "ExplanationFact",
+          "type": "object"
+        },
+        "PrimaryRegime": {
+          "enum": [
+            "bull",
+            "bear",
+            "ranging"
+          ],
+          "title": "PrimaryRegime",
+          "type": "string"
+        },
+        "Signal": {
+          "enum": [
+            "BUY",
+            "HOLD",
+            "SELL"
+          ],
+          "title": "Signal",
+          "type": "string"
+        },
+        "Strength": {
+          "enum": [
+            "strong",
+            "moderate",
+            "weak"
+          ],
+          "title": "Strength",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "description": "A calibrated call plus everything needed to justify and size it.",
+      "properties": {
+        "as_of": {
+          "format": "date",
+          "title": "As Of",
+          "type": "string"
+        },
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "conviction": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Meta-labeller P(this call is correct). None until L5 is trained.",
+          "title": "Conviction"
+        },
+        "current_price": {
+          "exclusiveMinimum": 0,
+          "title": "Current Price",
+          "type": "number"
+        },
+        "facts": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ExplanationFact"
+          },
+          "title": "Facts",
+          "type": "array"
+        },
+        "horizon_months": {
+          "maximum": 24,
+          "minimum": 1,
+          "title": "Horizon Months",
+          "type": "integer"
+        },
+        "model_run_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model Run Id"
+        },
+        "probability_up": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Probability Up",
+          "type": "number"
+        },
+        "regime": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PrimaryRegime"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "regime_aligned": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Regime Aligned"
+        },
+        "signal": {
+          "$ref": "#/$defs/Signal"
+        },
+        "strength": {
+          "$ref": "#/$defs/Strength"
+        },
+        "suggested_position_pct": {
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Suggested Position Pct",
+          "type": "number"
+        },
+        "symbol": {
+          "title": "Symbol",
+          "type": "string"
+        }
+      },
+      "required": [
+        "symbol",
+        "as_of",
+        "horizon_months",
+        "signal",
+        "probability_up",
+        "confidence",
+        "strength",
+        "current_price",
+        "suggested_position_pct"
+      ],
+      "title": "Prediction",
+      "type": "object"
+    },
+    "QualityReport": {
+      "$defs": {
+        "RuleResult": {
+          "additionalProperties": false,
+          "description": "The outcome of one rule against one ingestion batch.\n\n`evidence` must be populated on failure. \"Rule X failed\" without actual\nvs expected is not actionable at 3am.",
+          "properties": {
+            "affected_rows": {
+              "default": 0,
+              "title": "Affected Rows",
+              "type": "integer"
+            },
+            "affected_symbols": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Affected Symbols",
+              "type": "array"
+            },
+            "evidence": {
+              "additionalProperties": true,
+              "title": "Evidence",
+              "type": "object"
+            },
+            "message": {
+              "title": "Message",
+              "type": "string"
+            },
+            "passed": {
+              "title": "Passed",
+              "type": "boolean"
+            },
+            "rule_id": {
+              "pattern": "^T[1-6]\\.[a-z_]+\\.[a-z_0-9]+$",
+              "title": "Rule Id",
+              "type": "string"
+            },
+            "severity": {
+              "$ref": "#/$defs/Severity"
+            },
+            "tier": {
+              "$ref": "#/$defs/Tier"
+            }
+          },
+          "required": [
+            "rule_id",
+            "tier",
+            "severity",
+            "passed",
+            "message"
+          ],
+          "title": "RuleResult",
+          "type": "object"
+        },
+        "Severity": {
+          "enum": [
+            "fatal",
+            "error",
+            "warning",
+            "info"
+          ],
+          "title": "Severity",
+          "type": "string"
+        },
+        "Tier": {
+          "description": "Rule tiers, ordered by how early they can reject.\n\nSTRUCTURAL failures kill the file. VALIDITY failures kill the row.\nEverything above that annotates rather than rejects, except where a\nthreshold escalates it.",
+          "enum": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "title": "Tier",
+          "type": "integer"
+        },
+        "Verdict": {
+          "enum": [
+            "pass",
+            "pass_with_warnings",
+            "quarantined",
+            "rejected"
+          ],
+          "title": "Verdict",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Everything the gate concluded about one ingestion batch.",
+      "properties": {
+        "finished_at": {
+          "format": "date-time",
+          "title": "Finished At",
+          "type": "string"
+        },
+        "results": {
+          "items": {
+            "$ref": "#/$defs/RuleResult"
+          },
+          "title": "Results",
+          "type": "array"
+        },
+        "rows_accepted": {
+          "minimum": 0,
+          "title": "Rows Accepted",
+          "type": "integer"
+        },
+        "rows_in": {
+          "minimum": 0,
+          "title": "Rows In",
+          "type": "integer"
+        },
+        "rows_quarantined": {
+          "minimum": 0,
+          "title": "Rows Quarantined",
+          "type": "integer"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "started_at": {
+          "format": "date-time",
+          "title": "Started At",
+          "type": "string"
+        },
+        "trade_date": {
+          "format": "date",
+          "title": "Trade Date",
+          "type": "string"
+        },
+        "verdict": {
+          "$ref": "#/$defs/Verdict"
+        }
+      },
+      "required": [
+        "run_id",
+        "trade_date",
+        "started_at",
+        "finished_at",
+        "verdict",
+        "rows_in",
+        "rows_accepted",
+        "rows_quarantined",
+        "results"
+      ],
+      "title": "QualityReport",
+      "type": "object"
+    },
+    "QualityScore": {
+      "additionalProperties": false,
+      "description": "Per-symbol fitness. Drives universe eligibility.\n\nThe five components are deliberately separate rather than a single opaque\nnumber, so an exclusion can be explained to a user in one sentence.",
+      "properties": {
+        "as_of": {
+          "format": "date",
+          "title": "As Of",
+          "type": "string"
+        },
+        "continuity_clean_rate": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Continuity Clean Rate",
+          "type": "number"
+        },
+        "history_completeness": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "History Completeness",
+          "type": "number"
+        },
+        "history_days": {
+          "minimum": 0,
+          "title": "History Days",
+          "type": "integer"
+        },
+        "liquidity_adequacy": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Liquidity Adequacy",
+          "type": "number"
+        },
+        "median_turnover": {
+          "minimum": 0,
+          "title": "Median Turnover",
+          "type": "number"
+        },
+        "recency": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Recency",
+          "type": "number"
+        },
+        "symbol": {
+          "title": "Symbol",
+          "type": "string"
+        },
+        "validity_clean_rate": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Validity Clean Rate",
+          "type": "number"
+        }
+      },
+      "required": [
+        "symbol",
+        "as_of",
+        "history_completeness",
+        "validity_clean_rate",
+        "continuity_clean_rate",
+        "liquidity_adequacy",
+        "recency",
+        "history_days",
+        "median_turnover"
+      ],
+      "title": "QualityScore",
+      "type": "object"
+    },
+    "QuarantineRecord": {
+      "additionalProperties": false,
+      "description": "A held row and the rule that held it. Never deleted \u2014 fix the rule,\nthen replay.",
+      "properties": {
+        "payload": {
+          "additionalProperties": true,
+          "title": "Payload",
+          "type": "object"
+        },
+        "quarantined_at": {
+          "format": "date-time",
+          "title": "Quarantined At",
+          "type": "string"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "rule_id": {
+          "title": "Rule Id",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "symbol": {
+          "title": "Symbol",
+          "type": "string"
+        },
+        "trade_date": {
+          "format": "date",
+          "title": "Trade Date",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "trade_date",
+        "symbol",
+        "rule_id",
+        "reason",
+        "payload",
+        "quarantined_at"
+      ],
+      "title": "QuarantineRecord",
+      "type": "object"
+    },
+    "RegimeResult": {
+      "$defs": {
+        "CompositeSignal": {
+          "enum": [
+            "risk_on",
+            "risk_off",
+            "neutral"
+          ],
+          "title": "CompositeSignal",
+          "type": "string"
+        },
+        "PrimaryRegime": {
+          "enum": [
+            "bull",
+            "bear",
+            "ranging"
+          ],
+          "title": "PrimaryRegime",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "adx": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Adx"
+        },
+        "as_of": {
+          "format": "date",
+          "title": "As Of",
+          "type": "string"
+        },
+        "composite_signal": {
+          "$ref": "#/$defs/CompositeSignal"
+        },
+        "drawdown_regime": {
+          "title": "Drawdown Regime",
+          "type": "string"
+        },
+        "primary_regime": {
+          "$ref": "#/$defs/PrimaryRegime"
+        },
+        "regime_score": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Regime Score",
+          "type": "number"
+        },
+        "symbol": {
+          "title": "Symbol",
+          "type": "string"
+        },
+        "trend_direction": {
+          "title": "Trend Direction",
+          "type": "string"
+        },
+        "volatility_regime": {
+          "title": "Volatility Regime",
+          "type": "string"
+        }
+      },
+      "required": [
+        "symbol",
+        "as_of",
+        "primary_regime",
+        "composite_signal",
+        "trend_direction",
+        "volatility_regime",
+        "drawdown_regime",
+        "regime_score"
+      ],
+      "title": "RegimeResult",
+      "type": "object"
+    },
+    "RuleResult": {
+      "$defs": {
+        "Severity": {
+          "enum": [
+            "fatal",
+            "error",
+            "warning",
+            "info"
+          ],
+          "title": "Severity",
+          "type": "string"
+        },
+        "Tier": {
+          "description": "Rule tiers, ordered by how early they can reject.\n\nSTRUCTURAL failures kill the file. VALIDITY failures kill the row.\nEverything above that annotates rather than rejects, except where a\nthreshold escalates it.",
+          "enum": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "title": "Tier",
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "description": "The outcome of one rule against one ingestion batch.\n\n`evidence` must be populated on failure. \"Rule X failed\" without actual\nvs expected is not actionable at 3am.",
+      "properties": {
+        "affected_rows": {
+          "default": 0,
+          "title": "Affected Rows",
+          "type": "integer"
+        },
+        "affected_symbols": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Affected Symbols",
+          "type": "array"
+        },
+        "evidence": {
+          "additionalProperties": true,
+          "title": "Evidence",
+          "type": "object"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "passed": {
+          "title": "Passed",
+          "type": "boolean"
+        },
+        "rule_id": {
+          "pattern": "^T[1-6]\\.[a-z_]+\\.[a-z_0-9]+$",
+          "title": "Rule Id",
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/Severity"
+        },
+        "tier": {
+          "$ref": "#/$defs/Tier"
+        }
+      },
+      "required": [
+        "rule_id",
+        "tier",
+        "severity",
+        "passed",
+        "message"
+      ],
+      "title": "RuleResult",
+      "type": "object"
+    },
+    "SymbolChange": {
+      "additionalProperties": false,
+      "description": "A symbol rename. Naive joins across a rename silently split one\ncompany's history into two, so this map is required, not optional.",
+      "properties": {
+        "effective_date": {
+          "format": "date",
+          "title": "Effective Date",
+          "type": "string"
+        },
+        "isin": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Isin"
+        },
+        "new_symbol": {
+          "title": "New Symbol",
+          "type": "string"
+        },
+        "old_symbol": {
+          "title": "Old Symbol",
+          "type": "string"
+        }
+      },
+      "required": [
+        "old_symbol",
+        "new_symbol",
+        "effective_date"
+      ],
+      "title": "SymbolChange",
+      "type": "object"
+    },
+    "SymbolMeta": {
+      "$defs": {
+        "ListingStatus": {
+          "enum": [
+            "listed",
+            "delisted",
+            "suspended"
+          ],
+          "title": "ListingStatus",
+          "type": "string"
+        },
+        "Series": {
+          "description": "NSE equity series. EQ is the rolling-settlement equity series we model.\n\nBE/BZ are trade-for-trade (surveillance) series; SM/ST are SME platform.\nWe keep them ingested but they are excluded from the eligible universe.",
+          "enum": [
+            "EQ",
+            "BE",
+            "BZ",
+            "SM",
+            "ST",
+            "OTHER"
+          ],
+          "title": "Series",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "description": "What we know about a security independent of any single trading day.\n\n`delisted_on` being set is what makes the historical universe\nsurvivorship-bias-free: the symbol stays in history and stops being\neligible, rather than vanishing.",
+      "properties": {
+        "delisted_on": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Delisted On"
+        },
+        "first_seen": {
+          "format": "date",
+          "title": "First Seen",
+          "type": "string"
+        },
+        "isin": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Isin"
+        },
+        "last_seen": {
+          "format": "date",
+          "title": "Last Seen",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "sector": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sector"
+        },
+        "series": {
+          "$ref": "#/$defs/Series",
+          "default": "EQ"
+        },
+        "status": {
+          "$ref": "#/$defs/ListingStatus",
+          "default": "listed"
+        },
+        "symbol": {
+          "title": "Symbol",
+          "type": "string"
+        }
+      },
+      "required": [
+        "symbol",
+        "first_seen",
+        "last_seen"
+      ],
+      "title": "SymbolMeta",
+      "type": "object"
+    },
+    "TradingCalendar": {
+      "additionalProperties": false,
+      "description": "Which days the exchange actually traded. Required to tell 'no file\nbecause it was a holiday' apart from 'no file because ingestion broke'.",
+      "properties": {
+        "end": {
+          "format": "date",
+          "title": "End",
+          "type": "string"
+        },
+        "start": {
+          "format": "date",
+          "title": "Start",
+          "type": "string"
+        },
+        "trading_days": {
+          "items": {
+            "format": "date",
+            "type": "string"
+          },
+          "title": "Trading Days",
+          "type": "array"
+        }
+      },
+      "required": [
+        "start",
+        "end",
+        "trading_days"
+      ],
+      "title": "TradingCalendar",
+      "type": "object"
+    },
+    "UniverseSnapshot": {
+      "additionalProperties": false,
+      "description": "Point-in-time universe. `as_of` is load-bearing: asking for the\nuniverse without a date is how survivorship bias gets in.",
+      "properties": {
+        "as_of": {
+          "format": "date",
+          "title": "As Of",
+          "type": "string"
+        },
+        "eligible_symbols": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Eligible Symbols",
+          "type": "array"
+        },
+        "excluded": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "symbol -> human-readable reason it is not eligible",
+          "title": "Excluded",
+          "type": "object"
+        },
+        "index_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Index Name"
+        },
+        "symbols": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Symbols",
+          "type": "array"
+        }
+      },
+      "required": [
+        "as_of",
+        "symbols",
+        "eligible_symbols"
+      ],
+      "title": "UniverseSnapshot",
+      "type": "object"
+    }
+  }
+}

@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
+  baseURL: import.meta.env.VITE_API_URL || '',
   timeout: 120000, // 2 min — ML prediction takes time
   headers: { 'Content-Type': 'application/json' },
 })
@@ -28,5 +28,11 @@ export const getPrediction = (ticker, horizon_months = 6, model = 'gradient_boos
 
 export const getUniverse = (index = 'NIFTY50', limit = 15) =>
   api.get(`/api/universe`, { params: { index, limit } }).then(r => r.data)
+
+export const getStockRegime = (ticker) =>
+  api.get(`/api/regime/${ticker}`).then(r => r.data)
+
+export const getMarketRegime = () =>
+  api.get(`/api/regime/market/summary`).then(r => r.data)
 
 export default api
