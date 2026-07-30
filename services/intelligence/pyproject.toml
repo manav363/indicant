@@ -18,6 +18,9 @@ dependencies = [
     "scikit-learn>=1.5",
     "xgboost>=2.1",
     "scipy>=1.14",
+    "lightgbm>=4.5",
+    "shap>=0.46",
+    "statsmodels>=0.14",
 ]
 
 [project.optional-dependencies]
@@ -44,4 +47,7 @@ select = ["E", "F", "I", "N", "UP", "B", "SIM", "RUF"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q"
+addopts = "-q --cov=intelligence --cov-report=term-missing --cov-fail-under=85"
+
+[tool.coverage.run]
+omit = ["*/cli.py", "*/api/*"]
