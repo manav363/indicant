@@ -70,3 +70,6 @@ htmlcov/
 # Agent tooling
 .claude-flow/
 .hive-mind/
+
+# v2 venv
+.venv-v2/
