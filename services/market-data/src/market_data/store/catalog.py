@@ -19,6 +19,7 @@ from indicant_contracts import (
     Dataset,
     EligibilityThresholds,
     ListingStatus,
+    Series,
     SymbolMeta,
     UniverseSnapshot,
 )
@@ -61,7 +62,10 @@ class Catalog:
                 SymbolMeta(
                     symbol=str(row["symbol"]),
                     isin=None if pd.isna(row.get("isin")) else str(row["isin"]),
-                    series=str(row["series"]) if not pd.isna(row["series"]) else "EQ",  # type: ignore[arg-type]
+                    # NSE publishes series codes beyond the ones we model
+                    # (GB, GS, N0-N9, YR, IV...). A new instrument type on
+                    # the exchange must not break the registry.
+                    series=Series.coerce(row["series"]),
                     status=ListingStatus.DELISTED if gone else ListingStatus.LISTED,
                     first_seen=as_date(row["first_seen"]),
                     last_seen=last_seen,

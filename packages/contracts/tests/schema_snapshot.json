@@ -682,7 +682,7 @@
     "OHLCVBar": {
       "$defs": {
         "Series": {
-          "description": "NSE equity series. EQ is the rolling-settlement equity series we model.\n\nBE/BZ are trade-for-trade (surveillance) series; SM/ST are SME platform.\nWe keep them ingested but they are excluded from the eligible universe.",
+          "description": "NSE equity series. EQ is the rolling-settlement equity series we model.\n\nBE/BZ are trade-for-trade (surveillance) series; SM/ST are SME platform.\nWe keep them ingested but they are excluded from the eligible universe.\n\nNSE publishes far more series codes than these \u2014 real bhavcopy files carry\nGB (sovereign gold bonds), GS (government securities), N0-N9 (debentures),\nIV, YR, E1, BL and others, and the list grows without notice. Enumerating\nthem all is a losing game, so `coerce` folds anything unrecognised into\nOTHER rather than raising. A new instrument type appearing on the exchange\nis not a reason for the ingest to fall over; it is a reason to not model it.",
           "enum": [
             "EQ",
             "BE",
@@ -1501,7 +1501,7 @@
           "type": "string"
         },
         "Series": {
-          "description": "NSE equity series. EQ is the rolling-settlement equity series we model.\n\nBE/BZ are trade-for-trade (surveillance) series; SM/ST are SME platform.\nWe keep them ingested but they are excluded from the eligible universe.",
+          "description": "NSE equity series. EQ is the rolling-settlement equity series we model.\n\nBE/BZ are trade-for-trade (surveillance) series; SM/ST are SME platform.\nWe keep them ingested but they are excluded from the eligible universe.\n\nNSE publishes far more series codes than these \u2014 real bhavcopy files carry\nGB (sovereign gold bonds), GS (government securities), N0-N9 (debentures),\nIV, YR, E1, BL and others, and the list grows without notice. Enumerating\nthem all is a losing game, so `coerce` folds anything unrecognised into\nOTHER rather than raising. A new instrument type appearing on the exchange\nis not a reason for the ingest to fall over; it is a reason to not model it.",
           "enum": [
             "EQ",
             "BE",

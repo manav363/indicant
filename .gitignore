@@ -73,3 +73,7 @@ htmlcov/
 
 # v2 venv
 .venv-v2/
+
+# Local data lake and trained artifacts — regenerable, and large
+data/lake/
+data/corp_actions.csv
