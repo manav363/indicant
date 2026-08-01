@@ -1,0 +1,45 @@
+/* Shared by the stock page and the component gallery.
+ *
+ * These lived in StockPage.css, which meant the gallery rendered the same
+ * markup unstyled — list bullets showed through `list-style: none` because
+ * the rule was never loaded. Styles used by more than one page belong to
+ * neither page.
+ */
+
+.reading { max-width: var(--measure); margin-block-end: var(--space-16); }
+
+/* The probability sentence is set larger than body text — it is the most
+   important sentence on the page, and it is the one carrying the failure
+   framing. */
+.reading__probability {
+  font-size: var(--text-lg);
+  line-height: var(--leading-snug);
+  border-left: 2px solid var(--rule-strong);
+  padding-left: var(--space-4);
+  margin-block-end: var(--space-8);
+}
+
+.reading__drivers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: var(--space-8);
+  margin-block-end: var(--space-8);
+}
+
+.drivers__head {
+  font-size: var(--text-sm);
+  font-variant: small-caps;
+  letter-spacing: 0.08em;
+  color: var(--ink-muted);
+  font-family: var(--font-body);
+  margin: 0 0 var(--space-3);
+}
+
+.drivers__list { list-style: none; margin: 0; padding: 0; }
+.drivers__list li { padding-block: var(--space-1); }
+
+.reading__regime,
+.reading__conviction {
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+}

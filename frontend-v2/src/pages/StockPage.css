@@ -1,0 +1,86 @@
+.stock__horizons {
+  display: flex;
+  gap: var(--space-1);
+  margin-block: var(--space-12) var(--space-8);
+  border-bottom: 1px solid var(--rule);
+}
+
+.stock__horizon {
+  font-family: inherit;
+  font-size: var(--text-sm);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--ink-muted);
+  padding: var(--space-2) var(--space-4);
+  cursor: pointer;
+  margin-bottom: -1px;
+}
+
+.stock__horizon:hover { color: var(--ink); }
+
+.stock__horizon[aria-current="true"] {
+  color: var(--ink);
+  border-bottom-color: var(--ink);
+}
+
+.drivers-table { margin-block-end: var(--space-16); }
+.drivers-table h2 { margin-block-end: var(--space-4); }
+
+.drivers-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.drivers-table th,
+.drivers-table td {
+  text-align: right;
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--rule);
+}
+
+.drivers-table th[scope="row"],
+.drivers-table thead th:first-child { text-align: left; font-weight: 400; }
+
+.drivers-table thead th {
+  font-variant: small-caps;
+  letter-spacing: 0.08em;
+  color: var(--ink-muted);
+  font-weight: 400;
+}
+
+.stock__refusal {
+  max-width: var(--measure);
+  margin-block: var(--space-16);
+  padding: var(--space-8);
+  border: 1px solid var(--rule-strong);
+}
+
+/* A scope refusal is not an error, and must not be styled like one. Dashed
+   rule = "out of scope"; solid = "broken". */
+.stock__refusal[data-kind="scope"] { border-style: dashed; }
+
+.stock__refusal-head {
+  font-size: var(--text-xl);
+  font-variation-settings: "opsz" 24;
+  margin: 0 0 var(--space-4);
+}
+
+.stock__refusal-note {
+  font-size: var(--text-sm);
+  color: var(--ink-muted);
+  font-style: italic;
+}
+
+.stock__caveats {
+  border-top: 1px solid var(--rule);
+  padding-block-start: var(--space-6);
+  margin-block-end: var(--space-24);
+  font-size: var(--text-sm);
+  color: var(--ink-muted);
+  max-width: var(--measure);
+}
+
+.stock__degraded { font-style: italic; }
+.stock__loading { color: var(--ink-muted); font-style: italic; margin-block: var(--space-16); }

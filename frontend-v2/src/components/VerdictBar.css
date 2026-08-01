@@ -1,0 +1,85 @@
+.verdict {
+  margin-block-end: var(--space-12);
+}
+
+.verdict__headline {
+  font-family: var(--font-display);
+  /* Newsreader's optical-size axis: display sizes get the high-contrast cut
+     the face is drawn for, rather than a scaled-up text cut. */
+  font-variation-settings: "opsz" 36;
+  font-weight: 400;
+  font-size: var(--text-hero);
+  line-height: var(--leading-tight);
+  letter-spacing: -0.02em;
+  max-width: 22ch;
+  margin: 0 0 var(--space-8);
+  text-wrap: balance;
+}
+
+.verdict__gauge {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.verdict__track {
+  position: relative;
+  height: 3.5rem;
+  background: var(--paper-sunk);
+  border-block: 1px solid var(--rule);
+}
+
+.verdict__centre {
+  position: absolute;
+  inset-block: 0;
+  left: 50%;
+  width: 1px;
+  background: var(--rule-strong);
+}
+
+.verdict__fill {
+  position: absolute;
+  inset-block: 0;
+  /* Only transform/opacity animate — never width, which would thrash layout. */
+  transition: opacity var(--duration-normal) var(--ease-out);
+}
+
+.verdict__readout {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+/* Colour comes from the encoding object via an inline style, not from a
+   sibling selector. A selector that infers direction from DOM order breaks
+   silently the moment the markup is reordered. */
+.verdict__glyph {
+  font-size: var(--text-xl);
+  line-height: 1;
+}
+
+.verdict__signal {
+  font-family: var(--font-mono);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.verdict__strength {
+  font-size: var(--text-sm);
+  color: var(--ink-muted);
+  font-style: italic;
+}
+
+.verdict__scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--text-xs);
+  color: var(--ink-muted);
+  font-variant: small-caps;
+  letter-spacing: 0.06em;
+  margin-block-start: var(--space-2);
+}
+
+@media (max-width: 32rem) {
+  .verdict__track { height: 2.5rem; }
+}
