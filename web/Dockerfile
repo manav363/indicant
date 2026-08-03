@@ -20,5 +20,8 @@ COPY infra/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
 
 EXPOSE 80
+# 127.0.0.1, not `localhost`. In this image localhost resolves to [::1] first
+# and nginx's `listen 80` binds IPv4 only, so the check failed against a
+# perfectly healthy server — which then blocked anything depending on it.
 HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=5 \
-  CMD wget -qO- http://localhost/ >/dev/null 2>&1 || exit 1
+  CMD wget -qO- http://127.0.0.1/ >/dev/null 2>&1 || exit 1
