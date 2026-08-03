@@ -1,0 +1,114 @@
+.term {
+  min-height: 100vh; display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  background: var(--bg); color: var(--fg);
+  font-family: var(--sans); font-size: var(--t-base);
+}
+
+/* ---- status bar ------------------------------------------------------- */
+.statusbar {
+  display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap;
+  padding: var(--s2) var(--s4);
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-panel);
+  font-family: var(--mono); font-size: var(--t-xs);
+}
+.statusbar__brand { font-weight: 600; letter-spacing: 0.18em; color: var(--accent); }
+.statusbar__sep { color: var(--line-bright); }
+.statusbar__item em { font-style: normal; color: var(--fg-faint); letter-spacing: 0.1em; }
+.statusbar__warn { color: var(--dir-down); }
+/* Deliberately faint and uncoloured — an unknown must not borrow the visual
+   weight of a finding. */
+.statusbar__pending { color: var(--fg-faint); }
+.statusbar__right { margin-left: auto; }
+
+.statusbar__select {
+  background: var(--bg-input); color: var(--fg);
+  border: 1px solid var(--line-bright);
+  font-family: var(--mono); font-size: var(--t-xs);
+  padding: 2px var(--s2);
+}
+
+[data-regime="bull"] { color: var(--dir-up); }
+[data-regime="bear"] { color: var(--dir-down); }
+
+/* ---- toolbar ---------------------------------------------------------- */
+.toolbar {
+  display: flex; align-items: center; gap: var(--s4);
+  padding: var(--s3) var(--s4);
+  border-bottom: 1px solid var(--line);
+}
+.toolbar__symbol {
+  margin-left: auto; font-size: var(--t-xl); font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.horizons { display: flex; border: 1px solid var(--line-bright); }
+.horizons__btn {
+  background: none; border: none; color: var(--fg-dim);
+  font-family: var(--mono); font-size: var(--t-sm);
+  padding: var(--s2) var(--s3); cursor: pointer;
+  border-right: 1px solid var(--line-bright);
+}
+.horizons__btn:last-child { border-right: none; }
+.horizons__btn:hover { color: var(--fg); background: var(--bg-raised); }
+.horizons__btn[aria-current="true"] { color: var(--bg); background: var(--fg); }
+
+/* ---- grid ------------------------------------------------------------- */
+.grid {
+  display: grid; gap: var(--s3); padding: var(--s3) var(--s4);
+  grid-template-columns: minmax(0, 1fr) 22rem;
+  grid-template-areas: "chart panel" "screen panel";
+  align-content: start;
+}
+.grid__chart { grid-area: chart; min-height: 420px; }
+.verdict { grid-area: panel; }
+.grid__screen { grid-area: screen; }
+
+@media (max-width: 60rem) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "chart" "panel" "screen";
+  }
+}
+
+/* ---- screener --------------------------------------------------------- */
+.screen {
+  width: 100%; border-collapse: collapse;
+  font-family: var(--mono); font-size: var(--t-sm);
+  margin-top: var(--s2);
+}
+.screen th, .screen td {
+  text-align: right; padding: var(--s2) var(--s3);
+  border-bottom: 1px solid var(--line); white-space: nowrap;
+}
+.screen thead th {
+  font-family: var(--sans); font-size: var(--t-xs); font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.1em; color: var(--fg-faint);
+  border-bottom-color: var(--line-bright);
+}
+.screen th[scope="row"] { text-align: left; font-weight: 500; letter-spacing: 0.05em; }
+.screen tbody tr { cursor: pointer; }
+.screen tbody tr:hover { background: var(--bg-raised); }
+.screen tbody tr.is-current { background: var(--bg-panel); outline: 1px solid var(--accent); }
+
+.screen__bar-cell { display: flex; align-items: center; gap: var(--s2); justify-content: flex-end; }
+.screen__track {
+  position: relative; display: block; width: 7rem; height: 10px;
+  background: var(--bg-input);
+}
+.screen__centre { position: absolute; inset-block: 0; left: 50%; width: 1px; background: var(--line-bright); }
+.screen__bar { position: absolute; inset-block: 1px; }
+.screen__edge { min-width: 4rem; text-align: right; }
+.screen__none { color: var(--fg-faint); font-size: var(--t-sm); margin: var(--s3) 0 0; }
+
+/* ---- footer ----------------------------------------------------------- */
+.footer {
+  display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--s3);
+  padding: var(--s3) var(--s4);
+  border-top: 1px solid var(--line);
+  font-size: var(--t-xs); color: var(--fg-faint);
+}
+.footer__enc { font-family: var(--mono); }
+
+.chart--empty[data-kind="scope"] { border-style: dashed; }

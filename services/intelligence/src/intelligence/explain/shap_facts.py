@@ -36,6 +36,21 @@ DEFAULT_TOP_N = 3
 MIN_ABS_SHAP = 1e-4
 
 
+CRORE = 10_000_000
+LAKH = 100_000
+
+
+def _compact(value: float) -> str:
+    """Indian-numbering short form: -200409347 -> "-20.0 crore"."""
+    sign = "-" if value < 0 else ""
+    n = abs(value)
+    if n >= CRORE:
+        return f"{sign}{n / CRORE:.1f} crore"
+    if n >= LAKH:
+        return f"{sign}{n / LAKH:.1f} lakh"
+    return f"{sign}{n:,.0f}"
+
+
 @dataclass(frozen=True)
 class FeatureDisplay:
     """How one feature is described and formatted for a person."""
@@ -45,11 +60,16 @@ class FeatureDisplay:
     scale: float = 1.0
     precision: int = 1
     higher_is_bullish: bool | None = None
+    # For share/rupee counts, where the raw integer is unreadable. Indian
+    # numbering, because the audience is: crore and lakh, not million.
+    compact: bool = False
 
     def format(self, value: float) -> str:
         if not np.isfinite(value):
             return "unavailable"
         scaled = value * self.scale
+        if self.compact:
+            return _compact(scaled)
         return f"{scaled:+.{self.precision}f}{self.unit}" if self.unit == "%" else (
             f"{scaled:.{self.precision}f}{self.unit}"
         )
@@ -58,29 +78,53 @@ class FeatureDisplay:
 # Explicit descriptions for the features a person is most likely to see.
 # Anything absent falls back to a derived label, which is legible but blunter.
 FEATURE_DISPLAY: dict[str, FeatureDisplay] = {
-    "momentum_roc_1m": FeatureDisplay("1-month price change", "%", 100.0),
-    "momentum_roc_3m": FeatureDisplay("3-month price change", "%", 100.0),
-    "momentum_roc_6m": FeatureDisplay("6-month price change", "%", 100.0),
-    "momentum_roc_12m": FeatureDisplay("12-month price change", "%", 100.0),
+    # ROC is ALREADY a percentage in technical.py (the formula ends in "* 100").
+    # Scaling again turned a -11.9% move into "-1193.0%" on screen — a number
+    # so wrong it discredits every other figure beside it.
+    "momentum_roc_1m": FeatureDisplay("1-month price change", "%", 1.0),
+    "momentum_roc_3m": FeatureDisplay("3-month price change", "%", 1.0),
+    "momentum_roc_6m": FeatureDisplay("6-month price change", "%", 1.0),
+    "momentum_roc_12m": FeatureDisplay("12-month price change", "%", 1.0),
     "momentum_rsi_14": FeatureDisplay("14-day RSI (overbought/oversold)", precision=0),
     "momentum_rsi_28": FeatureDisplay("28-day RSI", precision=0),
     "trend_sma_50": FeatureDisplay("50-day average price", precision=0),
     "trend_sma_200": FeatureDisplay("200-day average price", precision=0),
     "trend_ema_50": FeatureDisplay("50-day weighted average price", precision=0),
     "trend_macd": FeatureDisplay("MACD (trend momentum)", precision=2),
-    "trend_price_vs_sma_50": FeatureDisplay("distance from the 50-day average", "%", 100.0),
-    "trend_price_vs_sma_200": FeatureDisplay("distance from the 200-day average", "%", 100.0),
+    "trend_price_vs_sma20": FeatureDisplay("distance from the 20-day average", "%", 100.0),
+    "trend_price_vs_sma50": FeatureDisplay("distance from the 50-day average", "%", 100.0),
+    "trend_price_vs_sma200": FeatureDisplay("distance from the 200-day average", "%", 100.0),
     "volatility_atr_14": FeatureDisplay("typical daily range", precision=2),
     "volatility_atr_21": FeatureDisplay("typical daily range (21-day)", precision=2),
     "volatility_realised_63": FeatureDisplay("recent price swings", "%", 100.0),
     "volatility_bb_pctb": FeatureDisplay("position within its trading band", precision=2),
-    "volume_obv": FeatureDisplay("cumulative buying vs selling pressure", precision=0),
+    # Raw OBV is a running signed-volume total in the hundreds of millions. As a
+    # bare integer it reads as noise, so it is shown in crore.
+    "volume_obv": FeatureDisplay("cumulative buying vs selling pressure", compact=True),
     "volume_ratio": FeatureDisplay("trading volume vs normal", precision=2),
     "regime_adx": FeatureDisplay("trend strength", precision=0),
     "regime_drawdown": FeatureDisplay("fall from its recent peak", "%", 100.0),
+    # A 0-1 position, not a percentage — 0.85 means "near the top of its range".
     "regime_52w_position": FeatureDisplay("position in its 52-week range", precision=2),
     "regime_trend_consistency": FeatureDisplay("how steady the trend has been", precision=2),
 }
+
+class _PercentileDisplay(FeatureDisplay):
+    """Formats a 0-1 cross-sectional rank as an ordinal percentile."""
+
+    def __init__(self, name: str) -> None:
+        super().__init__(name=name)
+
+    def format(self, value: float) -> str:
+        if not np.isfinite(value):
+            return "unavailable"
+        pct = round(value * 100)
+        if pct >= 90:
+            return f"{pct}th percentile — near the top of the market"
+        if pct <= 10:
+            return f"{pct}th percentile — near the bottom of the market"
+        return f"{pct}th percentile"
+
 
 # Suffixes added by panel construction, stripped before display so a user sees
 # "6-month price change" rather than "momentum_roc_6m_xs".
@@ -100,6 +144,14 @@ def describe(feature: str) -> tuple[str, FeatureDisplay]:
         if base.endswith(suffix):
             base, suffix_label = base[: -len(suffix)], label
             break
+
+    # A cross-sectional or sector-neutral value is a RANK, not the underlying
+    # quantity — inheriting the base feature's unit rendered a 10th-percentile
+    # rank as "+0.1%", which reads as a tiny price move rather than "near the
+    # bottom of the market". Ranks get their own formatting.
+    if suffix_label:
+        base_label, _ = describe(base)
+        return base_label + suffix_label, _PercentileDisplay(base_label)
 
     display = FEATURE_DISPLAY.get(base)
     if display is None:
@@ -175,14 +227,14 @@ class ShapExplainer:
 
     def __init__(self, model: object, feature_names: list[str]) -> None:
         self.feature_names = feature_names
-        self._model = model
+        self._model = self._unwrap(model)
         self._explainer = None
         self.method = "unavailable"
 
         try:
             import shap
 
-            self._explainer = shap.TreeExplainer(model)
+            self._explainer = shap.TreeExplainer(self._model)
             self.method = "tree_shap"
         except ImportError:
             logger.warning("shap not installed; falling back to linear attribution")
@@ -202,6 +254,29 @@ class ShapExplainer:
                 values = values[:, :, 1]
             return values
         return self._linear_attribution(X)
+
+    @staticmethod
+    def _unwrap(model: object) -> object:
+        """Reach inside a stack for something explainable.
+
+        A ServingStack is a meta-learner over base learners, and SHAP cannot
+        read it directly — which previously meant every prediction shipped with
+        ZERO drivers. But the stack contains real gradient-boosted trees, and
+        explaining the strongest of those answers the user's actual question
+        ("why this call?") far better than an empty list.
+
+        This is an approximation and the caller can tell: `method` reports
+        `tree_shap` on a base learner, not on the stack. The alternative was a
+        UI that never explains itself.
+        """
+        base = getattr(model, "base_models", None)
+        if not isinstance(base, dict) or not base:
+            return model
+        # Prefer a boosted tree — TreeExplainer is exact for these.
+        for name in ("xgboost", "lightgbm", "random_forest"):
+            if name in base:
+                return base[name]
+        return next(iter(base.values()))
 
     def _linear_attribution(self, X: pd.DataFrame) -> np.ndarray:
         """coef * (x - mean). Exact for a linear model, indicative otherwise.

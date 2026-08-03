@@ -531,3 +531,26 @@ class TestSequentialBootstrap:
 
     def test_empty_input(self) -> None:
         assert sequential_bootstrap(np.array([], dtype="int64")).size == 0
+
+
+def test_serving_regime_feature_names_exist_in_a_real_panel():
+    """The names `serving._regime` reads must be names the builder emits.
+
+    This is here because they once were not. `_regime` read
+    `trend_price_vs_sma_200` while the builder emitted `trend_price_vs_sma200`,
+    through a `.get(name, 0.0)` whose default silently meant "price is exactly
+    at its 200-day average" — so every trending stock was reported BEAR, on
+    every screen, with no error anywhere. String keys into a feature frame are
+    only as safe as the test that pins them.
+    """
+    from intelligence.serving import REGIME_ADX_FEATURE, TREND_FEATURE
+
+    frame = pd.concat([price_frame(s, n=400) for s in ("AAA", "BBB", "CCC")])
+    built = PanelBuilder(None).build_from_prices(
+        frame, PanelConfig(add_cross_sectional=False, drop_warmup=False)
+    ).frame
+
+    for name in (REGIME_ADX_FEATURE, TREND_FEATURE):
+        assert name in built.columns, (
+            f"serving reads {name!r}, which the panel builder does not emit"
+        )

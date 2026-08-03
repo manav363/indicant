@@ -179,17 +179,14 @@ async def stock(
             )).model_dump(),
         )
 
-    import pandas as pd
-
     bars = results["history"].data or []
-    frame = pd.DataFrame(bars)
 
     payload: dict[str, Any] = {
         "symbol": sym,
         "asOf": end.isoformat(),
         "horizonMonths": horizon_months,
-        "candles": candlestick_payload(frame) if not frame.empty else [],
-        "volume": volume_payload(frame) if not frame.empty else [],
+        "candles": candlestick_payload(bars),
+        "volume": volume_payload(bars),
         "meta": results["meta"].data if results["meta"].ok else None,
         "prediction": None,
         "verdictBar": None,

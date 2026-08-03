@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from datetime import date
 
-import pandas as pd
 import pytest
 from indicant_contracts import (
     Direction,
@@ -302,17 +301,29 @@ class TestDirectionEncoding:
             assert "#" not in d.css_var
 
 
-def ohlc(n: int = 3) -> pd.DataFrame:
-    return pd.DataFrame(
-        {
-            "date": [date(2026, 7, 27 + i) for i in range(n)],
-            "open": [100.0, 105.0, 103.0][:n],
-            "high": [106.0, 107.0, 104.0][:n],
-            "low": [99.0, 102.0, 100.0][:n],
-            "close": [105.0, 103.0, 103.0][:n],
-            "volume": [1_000_000, 2_000_000, 1_500_000][:n],
-        }
-    )
+def ohlc(n: int = 3, *, key: str = "time") -> list[dict[str, object]]:
+    """Bars in the shape market-data actually returns: a list of dicts.
+
+    These were DataFrames, which is why the gateway imported pandas at all.
+    `key` is parameterised because the two producers disagree on the field
+    name — market-data says `time`, the lake says `date` — and both must work.
+    """
+    rows = [
+        (date(2026, 7, 27 + i), o, h, low, c, v)
+        for i, (o, h, low, c, v) in enumerate(
+            zip(
+                [100.0, 105.0, 103.0][:n],
+                [106.0, 107.0, 104.0][:n],
+                [99.0, 102.0, 100.0][:n],
+                [105.0, 103.0, 103.0][:n],
+                [1_000_000, 2_000_000, 1_500_000][:n],
+            )
+        )
+    ]
+    return [
+        {key: d, "open": o, "high": h, "low": low, "close": c, "volume": v}
+        for d, o, h, low, c, v in rows
+    ]
 
 
 class TestCandlestickPayload:
@@ -330,7 +341,24 @@ class TestCandlestickPayload:
             assert {"direction", "glyph", "label", "colorVar"} <= set(bar)
 
     def test_empty_input_is_an_empty_list(self) -> None:
-        assert candlestick_payload(pd.DataFrame()) == []
+        assert candlestick_payload([]) == []
+        assert volume_payload([]) == []
+
+    def test_either_date_field_name_is_accepted(self) -> None:
+        """market-data says `time`, the lake says `date`.
+
+        The gateway used to rename one to the other at the call site, and when
+        the upstream name changed the rename was simply absent — a KeyError on
+        every chart request. Reading both here means the seam cannot drift.
+        """
+        by_time = candlestick_payload(ohlc(key="time"))
+        by_date = candlestick_payload(ohlc(key="date"))
+        assert by_time == by_date
+        assert by_time[0]["time"] == "2026-07-27"
+
+    def test_a_bar_with_neither_name_is_an_error_not_a_silent_gap(self) -> None:
+        with pytest.raises(KeyError):
+            candlestick_payload([{"open": 1.0, "high": 2.0, "low": 0.5, "close": 1.5}])
 
 
 class TestVolumePayload:

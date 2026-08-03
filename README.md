@@ -1,419 +1,195 @@
 # Indicant
 
-ML-powered long-term stock prediction for the Indian equity market. Input a ticker, get a calibrated BUY/HOLD/SELL signal with probability, feature importances, and risk metrics — backed by a full quantitative research pipeline built from first principles.
+ML-powered long-term prediction for Indian (NSE) equities. Type a ticker, get a
+calibrated probability that the stock is higher in N months, the drivers behind
+it, and — prominently — whether the model's edge is distinguishable from chance.
 
-![CI](https://github.com/manav363/indicant/actions/workflows/ci.yml/badge.svg)
-![Frontend CI](https://github.com/manav363/indicant/actions/workflows/frontend.yml/badge.svg)
+It currently is not. That is stated on every screen. See [Honest results](#honest-results).
+
 ![Python](https://img.shields.io/badge/python-3.13-blue)
-![Tests](https://img.shields.io/badge/tests-208%20passing-brightgreen)
-![Coverage](https://img.shields.io/badge/coverage-92.43%25-brightgreen)
+![Tests](https://img.shields.io/badge/tests-665%20passing-brightgreen)
 
 ---
 
-## Key Results
-
-| Metric | Value |
-|--------|-------|
-| **Tests passing** | 208 |
-| **Code coverage** | 92.43% |
-| **NIFTY universe coverage** | 500/504 tickers (99.2%) |
-| **Backtest — RELIANCE.NS** | Sharpe 0.19, Sortino 0.25, Max DD −25.2% |
-| **Backtest — TCS.NS** | Sharpe 0.02, Sortino 0.04, Max DD −30.2% |
-| **Backtest — HDFCBANK.NS** | Sharpe −0.45, Sortino −0.52, Max DD −25.6% |
-| **Backtest — ADANIENT.NS** | Sharpe −0.05, Sortino −0.07, Max DD −47.1% |
-| **Backtest — BAJFINANCE.NS** | Sharpe 0.44, Sortino 0.59, Max DD −36.3% |
-| **Permutation test (200 perms, 5 NIFTY 50 constituents)** | None significant at p < 0.05. BAJFINANCE closest at p=0.0995. Strategy edge not distinguishable from randomly shuffled labels across all tested tickers. |
-| **Historical spot-check — 2020 crash** | Bear + risk_off + high volatility correction drawdown (pinned to exact values) |
-| **Historical spot-check — 2021 bull** | Bull + risk_on + peak drawdown (pinned) |
-| **Historical spot-check — 2022 correction** | Bear + neutral (appropriately conservative — classifier doesn't false-alert risk_off) |
-
----
-
-## What it does
+## What it actually does
 
 You type `RELIANCE`. The system:
 
-1. Fetches 5 years of OHLCV data from NSE via yfinance (cached as parquet)
-2. Computes 46 technical indicators — all implemented from scratch in NumPy
-3. Creates forward-looking binary labels (will price be higher in N months?)
-4. Trains a walk-forward validated XGBoost model with Platt probability calibration
-5. Predicts on the most recent data point and returns a structured signal
-6. Detects market regime per-stock and market-wide (NIFTY 50 constituents)
-7. Runs backtests with permutation-test significance validation
+1. Reads OHLCV from a local parquet lake built from **NSE bhavcopy archives**
+   — the exchange's own end-of-day files, not a third-party API.
+2. Rebuilds the point-in-time universe for the date in question, including
+   companies that have since delisted.
+3. Computes a cross-sectional feature panel — each stock's indicators *and* its
+   rank against every other stock that day.
+4. Runs a stacked ensemble whose out-of-fold predictions were generated under
+   purged, embargoed cross-validation.
+5. Returns a probability, the SHAP drivers behind it, and the regime context.
 
-The result: a BUY/HOLD/SELL signal with a calibrated confidence score, the top feature drivers, a full technical indicator panel, and regime context — rendered in a React dashboard.
+The chart, the verdict, the drivers and the screener are one HTTP request.
+
+---
+
+## Honest results
+
+The model was trained on the real lake described below. These are its actual
+numbers, not a target:
+
+| Metric | Value | Reading |
+|---|---|---|
+| ROC AUC | **0.5470** | Barely above coin-flip, which is normal for this problem |
+| ElasticNet baseline AUC | 0.5256 | The stack beats a linear baseline by +0.0214 |
+| Brier skill score | +0.0027 | Calibration is marginally better than the base rate |
+| **Permutation test** | **p = 0.0597** (200 shuffles) | **NOT significant at 0.05** |
+
+**What that means:** across 200 runs on shuffled labels, about 12 did as well as
+the real model. The edge is real enough to beat a linear baseline and not strong
+enough to rule out luck. Gu, Kelly and Xiu found sub-1% monthly R² is state of
+the art in empirical asset pricing — an AUC of 0.547 is roughly that world.
+
+The UI never hides this. The status bar carries `p=0.0597 NOT significant`
+permanently, and the footer says the edge is not distinguishable from chance.
+
+Two design consequences follow:
+
+- With no trained model, every prediction endpoint returns **503**, never a
+  neutral 0.5. A 0.5 would reach the narrative layer and be rendered as a
+  genuine call about a real company.
+- A symbol the model cannot score is **absent** from the screener rather than
+  present with a placeholder.
+
+---
+
+## The data
+
+Built by walking the NSE bhavcopy archive. Two format eras are handled: the
+legacy layout and the UDiFF layout NSE cut over to on 2024-07-08.
+
+| | |
+|---|---|
+| Rows | **3,152,890** |
+| Symbols | 5,885 |
+| Trading days | 1,166 |
+| Range | 2022-01-03 → 2026-07-30 |
+| Corporate actions | 9,925 (668 price-affecting) |
+| Eligible symbols (latest PIT) | 897 |
+| Delisted names retained | 1,731 |
+
+**Survivorship bias is the reason for that last row.** Screening today's listed
+companies and backtesting them through 2022 silently asks "how did the survivors
+do?" — and the answer is always flattering. The universe is rebuilt per date
+from what was actually trading then.
+
+A sanity check that validated the whole pipeline: reconstructed from raw
+bhavcopy, INFY closed 2022 at −20.6% and TCS at −14.7% while RELIANCE was +6.0%
+and HDFCBANK +7.1% — the actual 2022 Indian IT selloff, which nothing in the
+code knows about.
+
+### The quality gate
+
+Six tiers, run before anything enters the lake: structural, validity,
+completeness, continuity, plausibility, cross-source. Failing rows are
+quarantined with the rule that rejected them, not dropped.
+
+Tier 4 (continuity) earned its keep during development: it caught a bug where
+`prev_close` was being scaled by its *own* row's adjustment factor instead of
+the previous day's, fabricating a continuity break on every corporate action.
 
 ---
 
 ## Architecture
 
-```mermaid
-flowchart TB
-    subgraph Frontend["Frontend (React 18 + Vite)"]
-        Home["Home (search)"]
-        StockDetail["StockDetail (analysis)"]
-        Universe["Universe (screener)"]
-        RegimePanel["RegimePanel (regime card)"]
-        MarketBanner["MarketBanner (market-wide)"]
-    end
-
-    subgraph API["API Layer (FastAPI)"]
-        Predict["POST /api/predict"]
-        Stocks["GET /api/stocks/*"]
-        UniverseAPI["GET /api/universe"]
-        RegimeAPI["GET /api/regime/*"]
-    end
-
-    subgraph Data["Data Layer"]
-        Fetcher["yfinance fetcher"]
-        Preprocessor["Preprocessor"]
-        UniverseData["NSE Universe"]
-    end
-
-    subgraph Features["Feature Engine"]
-        Tech["46 indicators (NumPy)"]
-        RegimeFeatures["Regime features (ADX)"]
-    end
-
-    subgraph Models["ML Models"]
-        XGB["XGBoost + Platt"]
-        Logistic["Logistic (from scratch)"]
-    end
-
-    subgraph Validation["Validation"]
-        WalkForward["Walk-forward CV\n(purge + embargo)"]
-        Backtest["Backtest Engine\n(Sharpe, Sortino, DD)"]
-        Permutation["Permutation Test\n(per-fold shuffling)"]
-    end
-
-    subgraph Registry["Model Registry"]
-        SQLite["SQLite (WAL mode)"]
-    end
-
-    subgraph Regime["Regime Detection"]
-        Classifier["RegimeClassifier\n(shared rules)"]
-        Aggregator["RegimeAggregator\n(NIFTY 50, TTL cache)"]
-    end
-
-    subgraph Risk["Risk & Signals"]
-        SignalGen["Signal Generator\n(BUY/HOLD/SELL)"]
-        Kelly["Kelly Sizing\n(half-Kelly)"]
-    end
-
-    Frontend --> API
-    API --> Data
-    API --> Models
-    API --> Regime
-    Data --> Features
-    Features --> Models
-    Models --> Validation
-    Models --> Risk
-    Models --> Registry
-    Regime --> Classifier
-    Regime --> Aggregator
-    Validation --> Backtest
-    Validation --> Permutation
-    Validation --> Registry
 ```
+web/                    React 18 + TS terminal (nginx, the only public ingress)
+  └── /api → gateway
+
+services/
+  gateway/              Composition + plain-language narrative. Public.
+  market-data/          Ingest, validate, adjust, serve. SINGLE WRITER to lake.
+  intelligence/         Panel, labels, stack, validation, serving. READ-ONLY lake.
+  worker/               Scheduled jobs (off by default)
+
+packages/contracts/     Shared Pydantic schemas + a schema-freeze snapshot
+
+data/lake/              Parquet. Gitignored.
+infra/                  docker-compose.yml, nginx.conf
+```
+
+Two planes, deliberately:
+
+- **Control plane (HTTP):** small questions — what is the universe, is this
+  symbol eligible, what did the gate say.
+- **Data plane (shared parquet):** `intelligence` reads parquet paths directly.
+  Moving a million training rows as JSON is minutes of serialization for zero
+  benefit.
+
+`market-data` mounts the lake read-write; `intelligence` mounts it **read-only**.
+That boundary is enforced by the mount, not by a code review comment.
+
+### The model stack
+
+| Layer | What |
+|---|---|
+| L0 | Pooled cross-sectional panel — 94 features incl. `_xs` market ranks |
+| L1 | Triple-barrier labelling (López de Prado) + average-uniqueness weights |
+| L2 | Heterogeneous base learners |
+| L3 | Stacking meta-learner over purged/embargoed OOF predictions |
+| L5 | Meta-labelling (not trained in the current run) |
+| L6 | Platt calibration |
+
+Validation is purged + embargoed CV **split by date, not by row** — splitting a
+panel by row leaks tomorrow's cross-section into today's fold. Also implemented:
+CPCV, Deflated Sharpe Ratio, and a permutation test with per-fold and
+within-date shuffling.
 
 ---
 
-## Module Reference
-
-Architecture details and full module API: [`docs/architecture.md`](docs/architecture.md)
-
-### `backend/market_regime/`
-
-| Module | Responsibility |
-|--------|---------------|
-| `data/` | OHLCV fetching, preprocessing, NSE universe management |
-| `features/` | 46 technical indicators from scratch in NumPy |
-| `models/` | XGBoost + Platt calibration, logistic regression from scratch |
-| `validation/` | Purged walk-forward CV, label construction |
-| `backtest/` | Walk-forward backtesting, metrics, permutation tests |
-| `regime/` | Per-stock and market-wide regime detection (cache 15 min TTL) |
-| `registry/` | SQLite model registry (experiment tracking) |
-| `signals/` | BUY/HOLD/SELL signal generation |
-| `risk/` | Half-Kelly position sizing |
-| `api/` | FastAPI routes, schemas, middleware |
-| `pipeline.py` | CLI orchestration (`indicant predict | backtest | screen`) |
-
----
-
-## Project structure
-
-```
-indicant/
-├── backend/
-│   ├── market_regime/
-│   │   ├── data/
-│   │   │   ├── fetcher.py          # yfinance with retries, parquet cache, alias map
-│   │   │   ├── universe.py         # NSE index universe (NIFTY 50/100/500)
-│   │   │   └── preprocessor.py     # cleaning, log returns, outlier detection
-│   │   ├── features/
-│   │   │   └── technical.py        # 46 indicators from scratch in NumPy
-│   │   ├── models/
-│   │   │   ├── base.py             # abstract BaseModel interface
-│   │   │   ├── logistic.py         # gradient descent from scratch
-│   │   │   └── gradient_boost.py   # XGBoost + Platt calibration
-│   │   ├── validation/
-│   │   │   └── walk_forward.py     # purged walk-forward CV + label maker
-│   │   ├── backtest/
-│   │   │   ├── engine.py           # run_backtest() with walk-forward fold loop
-│   │   │   ├── metrics.py          # Sharpe, Sortino, Max DD, CAGR, turnover
-│   │   │   └── permutation_test.py # label-shuffling significance test
-│   │   ├── regime/
-│   │   │   ├── config.py           # all regime threshold constants
-│   │   │   ├── classifier.py       # RegimeClassifier — shared rules
-│   │   │   └── market.py           # RegimeAggregator with TTL cache
-│   │   ├── registry/
-│   │   │   ├── schema.sql          # DDL with permutation + evaluation_freq columns
-│   │   │   └── model_registry.py   # SQLite-backed experiment tracking
-│   │   ├── signals/
-│   │   │   └── generator.py        # BUY/HOLD/SELL + ensemble voting
-│   │   ├── risk/
-│   │   │   └── sizing.py           # Kelly Criterion position sizing
-│   │   ├── api/
-│   │   │   ├── main.py             # FastAPI app, CORS, middleware, dotenv
-│   │   │   ├── schemas.py          # Pydantic v2 request/response models
-│   │   │   └── routes/
-│   │   │       ├── prediction.py   # POST /api/predict — full ML pipeline
-│   │   │       ├── stocks.py       # GET /api/stocks/search + /history
-│   │   │       ├── regime.py       # GET /api/regime/{ticker} + /api/regime/market/summary
-│   │   │       └── universe.py     # GET /api/universe — market screener
-│   │   └── pipeline.py             # CLI orchestration (indicant predict/screen/backtest)
-│   ├── tests/
-│   │   ├── test_data.py            # 26 data layer tests
-│   │   ├── test_features.py        # 17 feature engineering tests
-│   │   ├── test_models.py          # 14 model tests (99% gradient_boost coverage)
-│   │   ├── test_registry.py        # 27 model registry tests
-│   │   ├── test_backtest.py        # 47 backtest engine tests
-│   │   ├── test_permutation.py     # 11 permutation test tests
-│   │   └── test_regime.py          # 36 regime detection tests (cache, spot-checks)
-│   ├── Dockerfile
-│   └── pyproject.toml
-│
-├── frontend/
-│   ├── src/
-│   │   ├── pages/
-│   │   │   ├── Home.jsx            # search + feature overview
-│   │   │   ├── StockDetail.jsx     # full analysis with RegimePanel integration
-│   │   │   └── Universe.jsx        # market screener table
-│   │   ├── components/
-│   │   │   ├── PredictionCard.jsx  # signal, confidence meter, P(up), horizon
-│   │   │   ├── PriceChart.jsx      # price + volume (Recharts ComposedChart)
-│   │   │   ├── FeaturePanel.jsx    # 46 indicators in 4 sections with gauges
-│   │   │   ├── RiskMetrics.jsx     # RSI, drawdown, volatility, 52W position
-│   │   │   ├── RegimePanel.jsx     # regime badge, ADX gauge, sparkline
-│   │   │   └── StockSearch.jsx     # debounced autocomplete against NSE universe
-│   │   └── api/client.js           # axios with 120s timeout (ML pipeline time)
-│   ├── nginx.conf                  # SPA routing + /api/ proxy to backend
-│   ├── Dockerfile                  # multi-stage: node build → nginx serve
-│   └── package.json
-│
-├── docs/
-│   └── architecture.md             # Full architecture reference
-│
-├── .github/workflows/
-│   ├── ci.yml                      # ruff lint + mypy + pytest (blocks merge)
-│   ├── nightly.yml                 # Mon-Fri 6AM UTC drift detection
-│   └── frontend.yml                # npm ci + vite build + artifact upload
-│
-└── docker-compose.yml              # backend + frontend + volumes + health checks
-```
-
----
-
-## Running locally
-
-### Prerequisites
-
-- Python 3.11+
-- Node 20+
-- Docker + Docker Compose (optional)
-
-### Dev mode
+## Run it
 
 ```bash
-# Terminal 1 — Backend
-cd backend
-python3 -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
-uvicorn market_regime.api.main:app --reload --port 8000
-
-# Terminal 2 — Frontend
-cd frontend
-npm install
-npm run dev
+cd infra && docker compose up -d --build
 ```
 
-Open `http://localhost:5173`
+Then open **http://localhost:8080**.
 
-### Docker (production)
+The compose file bind-mounts `data/lake`, so the stack comes up on the real lake
+and trained model if you have them. A named volume would start empty, and an
+empty lake means a terminal that honestly reports "no lake / untrained" — running,
+but useless as a demo.
+
+Only `web` is published. `gateway`, `market-data` and `intelligence` are
+reachable only on the internal network, and nginx returns 404 for `/internal/`.
+
+### Tests
 
 ```bash
-cd frontend && npm install && cd ..   # generates package-lock.json
-docker-compose up --build
+./.venv-v2/bin/python -m pytest packages services --no-cov -q
 ```
 
-Open `http://localhost`
+653 Python tests, plus 12 in `web/` via `npm test`.
 
 ---
 
-## API
+## Design decisions worth knowing
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/predict` | Full ML pipeline for a ticker |
-| `GET` | `/api/stocks/search?q=RELIANCE` | Autocomplete search |
-| `GET` | `/api/stocks/{ticker}/history` | OHLCV price history |
-| `GET` | `/api/stocks/{ticker}/indicators` | Latest technical indicators |
-| `GET` | `/api/universe?index=NIFTY50` | Ranked market screener |
-| `GET` | `/api/regime/{ticker}` | Per-stock regime classification |
-| `GET` | `/api/regime/market/summary` | Market-wide regime (NIFTY 50 constituents) |
-| `GET` | `/health` | Health check |
+**Colour is never the only carrier of direction.** The obvious terminal
+green/red measures a CVD ΔE of 3.8 against this surface; GitHub's own dark-mode
+pair measures 3.5. Both are below the ΔE 6 floor — under deuteranopia they are
+effectively one colour, and most trading screens ship something in that range.
+The shipped pair (`#007928` / `#d2736c`) measures **9.7**, and every directional
+element still carries a glyph, a text label and a position. Set the palette
+selector to `monochrome` to check: with all colour removed the screen still reads.
 
-Swagger UI at `http://localhost:8000/docs`
+**Plain language is a separate layer.** `intelligence` emits facts with numbers;
+`gateway` turns facts into English. So copy changes without redeploying a model,
+the narrative is unit-testable with no model in the loop, and a wording change
+cannot silently alter a number.
 
-### Example — prediction
-
-```bash
-curl -X POST http://localhost:8000/api/predict \
-  -H "Content-Type: application/json" \
-  -d '{"ticker": "RELIANCE", "horizon_months": 6, "model": "gradient_boost"}'
-```
-
-```json
-{
-  "ticker": "RELIANCE.NS",
-  "company_name": "Reliance Industries Ltd.",
-  "signal": "BUY",
-  "confidence": 0.6575,
-  "probability_up": 0.6575,
-  "horizon_months": 6,
-  "current_price": 1321.2,
-  "top_features": [
-    {"feature": "volatility_atr_21", "importance": 41.35, "direction": "bullish"},
-    {"feature": "trend_ema_50",      "importance": 38.24, "direction": "bullish"},
-    {"feature": "momentum_roc_12m",  "importance": 36.24, "direction": "bearish"}
-  ]
-}
-```
-
-### Example — regime
-
-```bash
-curl http://localhost:8000/api/regime/RELIANCE
-```
-
-```json
-{
-  "ticker": "RELIANCE.NS",
-  "primary_regime": "Bull",
-  "regime_score": 0.72,
-  "trend_direction": "uptrend",
-  "volatility_regime": "normal",
-  "drawdown_regime": "peak",
-  "composite_signal": "risk_on",
-  "adx": 28.3
-}
-```
+**Probabilities are never stated bare.** Not "66% chance" but "66%, and about 34
+of every 100 calls like this went the other way."
 
 ---
 
-## Tests
+## Status
 
-```bash
-cd backend
-source .venv/bin/activate
-pytest tests/ -v --tb=short
-```
-
-```
-208 passed in 3.42s
-```
-
-### Test breakdown
-
-| Suite | Tests | Scope |
-|-------|-------|-------|
-| `test_data.py` | 26 | Fetcher, preprocessor, walk-forward split correctness |
-| `test_features.py` | 17 | Indicator math, no-lookahead checks |
-| `test_models.py` | 14 | Gradient boost (99% coverage), logistic regression |
-| `test_registry.py` | 27 | SQLite model registry CRUD |
-| `test_backtest.py` | 47 | Walk-forward backtest, metrics, edge cases |
-| `test_permutation.py` | 11 | Label shuffling, p-value correction |
-| `test_regime.py` | 36 | Classifier, market aggregator, cache, historical spot-checks |
-
----
-
-## CLI
-
-```bash
-# Single stock prediction
-indicant predict RELIANCE --horizon 6 --model gradient_boost
-
-# Screen an index for top BUY signals
-indicant screen --index NIFTY50 --horizon 6 --top 10
-
-# Walk-forward backtest
-indicant backtest RELIANCE --horizon 126 --eval-freq weekly
-```
-
----
-
-## ML Design — the parts that matter
-
-ML design details are covered in [`docs/ml-design.md`](docs/ml-design.md) (forthcoming). Key principles:
-
-- **Walk-forward validation** with purge + embargo periods prevents future leakage
-- **46 technical indicators** from scratch in NumPy — auditable, not a black box
-- **XGBoost + Platt calibration** for well-calibrated probabilities
-- **Per-stock + market-wide regime detection** with shared `RegimeClassifier` rules
-- **Permutation test** (per-fold label shuffling) provides honest significance assessment
-- **Half-Kelly position sizing** with volatility scaling
-
----
-
-## Tech stack
-
-| Layer | Technology |
-|-------|------------|
-| Data | yfinance, pandas, NumPy, pyarrow |
-| ML | XGBoost, scikit-learn, SciPy |
-| Experiment tracking | SQLite Model Registry (custom) |
-| API | FastAPI, Pydantic v2, Uvicorn |
-| Frontend | React 18, Vite, Tailwind CSS v3, Recharts, Zustand, Axios |
-| DevOps | Docker, nginx, GitHub Actions, Ruff, Mypy, Pytest |
-
----
-
-## What I implemented from scratch
-
-- **Sigmoid function** with numerical stability for large negative inputs
-- **Binary cross-entropy loss** with L2 regularisation
-- **Gradient descent** with mini-batch support, early stopping, Xavier initialisation
-- **SMA, EMA** (with `adjust=False` to match TradingView behaviour)
-- **Wilder's Moving Average (RMA)** used by RSI and ATR
-- **RSI** with correct gain/loss separation and edge case handling (all gains → RSI=100)
-- **Stochastic Oscillator** %K and %D
-- **MACD** line, signal, histogram
-- **Bollinger Bands** with %B and bandwidth
-- **True Range** and **ATR** accounting for overnight gaps
-- **OBV** with sign-based volume accumulation
-- **Rolling VWAP** using typical price weighting
-- **ADX** with +DI/-DI directional movement computation
-- **Realised volatility** annualised with √252
-- **Purged walk-forward cross-validator** with configurable purge and embargo periods
-- **Forward-looking label construction** with NaN handling
-- **Kelly Criterion** with half-Kelly and volatility scaling
-- **Platt scaling** (logistic regression on held-out scores for calibration)
-- **Model Registry** (SQLite, WAL mode, JSON hyperparams)
-- **Backtest Engine** (walk-forward, transaction costs, permutation testing)
-- **Regime Detection** (per-stock + market-wide, shared classifier, TTL cache)
-
----
-
-## Author
-
-**Manav Garg**
+Research project. **Not investment advice**, and by its own permutation test not
+yet a demonstrated edge.

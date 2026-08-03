@@ -14,8 +14,6 @@ venv/
 env/
 
 # Data & cache (never commit raw data)
-backend/data/
-backend/experiments/mlruns/
 data/
 *.parquet
 *.csv
@@ -37,8 +35,6 @@ data/
 mlruns/
 
 # Node
-frontend/node_modules/
-frontend/dist/
 frontend/.vite/
 *.log
 npm-debug.log*
@@ -77,3 +73,8 @@ htmlcov/
 # Local data lake and trained artifacts — regenerable, and large
 data/lake/
 data/corp_actions.csv
+
+# Node. Scoped to `frontend/` before, which stopped matching the moment that
+# directory was deleted — and a `git add -A` then staged 7,000 dependency files.
+node_modules/
+*.tsbuildinfo

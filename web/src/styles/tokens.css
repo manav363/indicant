@@ -1,0 +1,91 @@
+/* Terminal tokens.
+ *
+ * DIRECTION COLOURS ARE COMPUTED. Both values below are outputs of the dataviz
+ * validator run against THIS surface (#0d1117), not picked by eye:
+ *
+ *   #007928 / #d2736c   CVD ΔE 9.7 (protan) · normal 28.6 · contrast PASS
+ *
+ * Worth knowing what that replaced. The obvious terminal green/red measures
+ * ΔE 5.1, and GitHub's own dark-mode pair (#0f9d58 / #ff7b72) measures 3.5 —
+ * both below the 6 floor, meaning that under deuteranopia they are effectively
+ * one colour. Nearly every trading screen ships something in that range.
+ *
+ * The fix is the same one as the light theme: split hard in LIGHTNESS, which
+ * survives CVD when hue collapses. A deep green against a lighter red reads as
+ * the market convention and is legible to everyone.
+ *
+ * Direction is still never colour-alone — glyph, label and position carry it
+ * too. See lib/direction.ts.
+ */
+
+:root {
+  color-scheme: dark;
+
+  /* Ground — a true terminal dark, cool rather than warm. */
+  --bg: #0d1117;
+  --bg-panel: #11161d;
+  --bg-raised: #161b23;
+  --bg-input: #0a0d12;
+
+  --line: #222932;
+  --line-bright: #313a46;
+
+  --fg: #e6edf3;
+  --fg-dim: #9aa7b4;
+  --fg-faint: #626d7a;
+
+  /* VALIDATED — do not hand-edit without re-running the validator. */
+  --dir-up: #007928;
+  --dir-down: #d2736c;
+  --dir-flat: #626d7a;
+  --dir-up-wash: #0079281f;
+  --dir-down-wash: #d2736c24;
+
+  --accent: #3d8bfd;
+
+  /* Type. Mono-led because every number here came out of a fixed-width
+     government CSV and columns of prices must align to be scannable. */
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+
+  --t-xs: 11px;
+  --t-sm: 12px;
+  --t-base: 13px;
+  --t-lg: 16px;
+  --t-xl: 21px;
+  --t-2xl: 30px;
+  --t-hero: 44px;
+
+  /* Dense by intent — a terminal shows more, not bigger. */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s6: 24px;
+  --s8: 32px;
+
+  --dur: 120ms;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Colour-vision-safe alternate, also validated on this surface. */
+:root[data-palette="cvd"] {
+  --dir-up: #0095dd;
+  --dir-down: #c66c00;
+  --dir-up-wash: #0095dd1f;
+  --dir-down-wash: #c66c0024;
+}
+
+/* Monochrome — the acceptance test, shipped as a setting so the claim
+   "every chart reads with no colour" stays continuously falsifiable. */
+:root[data-palette="mono"] {
+  --dir-up: var(--fg);
+  --dir-down: var(--fg-dim);
+  --dir-flat: var(--fg-faint);
+  --dir-up-wash: transparent;
+  --dir-down-wash: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur: 0.01ms; }
+}

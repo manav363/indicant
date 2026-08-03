@@ -49,6 +49,13 @@ MODERATE = 0.60
 # Feature computation needs this much history before its output is meaningful.
 SERVING_LOOKBACK_DAYS = 500
 
+# Named, not inlined, because these must match the feature builder's output
+# EXACTLY. They are asserted against a freshly built panel in the tests — a
+# silently misspelled name here reads as a real regime call rather than a bug.
+REGIME_ADX_FEATURE = "regime_adx"
+TREND_FEATURE = "trend_price_vs_sma200"
+ADX_TRENDING_THRESHOLD = 20.0
+
 
 class ModelNotTrained(RuntimeError):
     """No usable artifact. Raised rather than returning a neutral prediction.
@@ -131,6 +138,36 @@ class PredictionService:
         self._client = client
         self._model = model
         self._builder = PanelBuilder(client)
+        # Cross-sectional serving means every prediction builds the panel for the
+        # WHOLE universe — so screening 30 symbols built the identical 30-symbol
+        # panel 30 times (23s for /regime/market). The panel is a pure function
+        # of (symbols, as_of), so one entry per trading day is all that is
+        # needed; a new bar changes as_of and the old entry falls out.
+        self._panel_cache: dict[tuple[tuple[str, ...], date], pd.DataFrame] = {}
+
+    def _panel(self, symbols: list[str], as_of: date) -> pd.DataFrame:
+        """The feature panel for a symbol set, memoised per trading day."""
+        key = (tuple(symbols), as_of)
+        cached = self._panel_cache.get(key)
+        if cached is not None:
+            return cached
+
+        start = as_of - timedelta(days=SERVING_LOOKBACK_DAYS)
+        prices = self._client.read_panel(symbols=symbols, start=start, end=as_of)
+        if prices.empty:
+            raise KeyError(f"no rows in the lake for {start}..{as_of}")
+
+        needs_xs = self.model.needs_cross_section
+        result = self._builder.build_from_prices(
+            prices,
+            PanelConfig(add_cross_sectional=needs_xs, drop_warmup=False),
+        )
+        # Bounded by hand rather than lru_cache: the value is a DataFrame worth
+        # tens of MB, and an unbounded cache keyed by date is a slow leak.
+        if len(self._panel_cache) >= 2:
+            self._panel_cache.clear()
+        self._panel_cache[key] = result.frame
+        return result.frame
 
     @property
     def model(self) -> ServedModel:
@@ -152,7 +189,6 @@ class PredictionService:
         sym = symbol.upper()
 
         as_of = as_of or (self._client.trading_days() or [date.today()])[-1]
-        start = as_of - timedelta(days=SERVING_LOOKBACK_DAYS)
 
         # A cross-sectional feature is defined relative to a SET of symbols, so
         # reproducing it means rebuilding that set. Serving one symbol alone
@@ -163,20 +199,11 @@ class PredictionService:
         universe = self.model.universe or [sym]
         symbols = sorted(set(universe) | {sym}) if needs_xs else [sym]
 
-        prices = self._client.read_panel(symbols=symbols, start=start, end=as_of)
-        if prices.empty:
-            raise KeyError(f"{sym}: no rows in the lake for {start}..{as_of}")
-        if sym not in set(prices["symbol"]):
-            raise KeyError(f"{sym}: not present in the lake for {start}..{as_of}")
-
-        result = self._builder.build_from_prices(
-            prices,
-            PanelConfig(add_cross_sectional=needs_xs, drop_warmup=False),
-        )
-        if result.frame.empty:
+        frame = self._panel(symbols, as_of)
+        if frame.empty:
             raise KeyError(f"{sym}: not enough history to compute features")
 
-        own = result.frame[result.frame["symbol"] == sym]
+        own = frame[frame["symbol"] == sym]
         if own.empty:
             raise KeyError(
                 f"{sym}: dropped during feature construction "
@@ -209,7 +236,10 @@ class PredictionService:
             conviction=None,  # L5 meta-labeller is not trained in this run
             current_price=float(latest["close"].iloc[0]),
             suggested_position_pct=self._position_size(proba, confidence),
-            regime=self._regime(result.frame),
+            # `own`, not the whole panel: _regime takes the last row by date, and
+            # in a cross-sectional panel that is whichever symbol happens to sort
+            # last — which handed every stock the same regime.
+            regime=self._regime(own),
             facts=facts,
             model_run_id=model.run_id,
         )
@@ -247,16 +277,18 @@ class PredictionService:
         Recomputing here would mean the regime shown beside a prediction could
         differ from the one the features encoded.
         """
-        if "regime_adx" not in frame.columns:
+        if "regime_adx" not in frame.columns or TREND_FEATURE not in frame.columns:
+            # No default here. This previously read a misspelled name through
+            # `.get(name, 0.0)`, and 0.0 is not "unknown" — it means "exactly at
+            # the 200-day average", so every trending stock scored BEAR. A
+            # missing feature is missing; say so instead of inventing a neutral.
             return None
         latest = frame.sort_values("date").iloc[-1]
-        adx = latest.get("regime_adx")
-        if adx is None or not np.isfinite(adx):
+        adx = latest[REGIME_ADX_FEATURE]
+        trend = latest[TREND_FEATURE]
+        if not np.isfinite(adx) or not np.isfinite(trend):
             return None
-        if adx < 20:
-            return PrimaryRegime.RANGING
-        trend = latest.get("trend_price_vs_sma_200", 0.0)
-        if not np.isfinite(trend):
+        if adx < ADX_TRENDING_THRESHOLD:
             return PrimaryRegime.RANGING
         return PrimaryRegime.BULL if trend > 0 else PrimaryRegime.BEAR
 

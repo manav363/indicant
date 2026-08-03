@@ -68,7 +68,12 @@ class UpstreamClient:
     ) -> UpstreamResult:
         url = f"{self._base_url}{path}"
         try:
-            resp = await client.get(url, params=params or {}, timeout=self._timeout)
+            # `params=params`, NOT `params or {}`. httpx REPLACES a URL's
+            # query string when params is passed, so an empty dict silently
+            # wiped `?start=...&end=...` off callers that build the query
+            # into the path — the upstream then 422'd on missing required
+            # arguments and the gateway reported it as 'upstream broken'.
+            resp = await client.get(url, params=params, timeout=self._timeout)
         except httpx.TimeoutException:
             return UpstreamResult.failure(
                 name, ErrorCode.UPSTREAM_UNAVAILABLE,

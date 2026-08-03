@@ -23,6 +23,7 @@ from indicant_contracts import (
     UniverseSnapshot,
 )
 
+from market_data._dates import as_date
 from market_data.ingest.calendar import TradingCalendarService
 from market_data.quality.quarantine import QuarantineStore
 from market_data.quality.scoring import QualityScorer
@@ -174,7 +175,9 @@ def symbol_history(
     frame = frame.sort_values("date").tail(MAX_HISTORY_BARS)
     return [
         {
-            "time": str(row["date"]),
+            # ISO date, not str(Timestamp) — the latter yields
+            # "2025-08-04 00:00:00", which lightweight-charts rejects.
+            "time": as_date(row["date"]).isoformat(),
             "open": float(row["open"]),
             "high": float(row["high"]),
             "low": float(row["low"]),
