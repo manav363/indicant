@@ -201,6 +201,33 @@ def cmd_adjust(args: argparse.Namespace) -> int:
         return 1
 
     actions = _load_actions(lake)
+
+    # Refuse to write an "adjusted" dataset from zero corporate actions.
+    #
+    # With no actions the output is byte-identical to the raw prices, but it
+    # lands under `adjusted/` — and every downstream reader treats that name as
+    # a promise that splits have been handled. `intelligence` defaults to it
+    # precisely so nobody trains on split-contaminated returns by accident.
+    # Writing an empty adjustment would defeat that guard while looking like it
+    # had been satisfied, which is worse than not writing at all.
+    if not actions and not args.allow_no_actions:
+        print(
+            "REFUSING: no corporate actions are loaded, so 'adjusted' would be "
+            "identical to the raw prices while claiming splits had been handled.\n"
+            "  Load them first:  indicant-md actions --file <corp_actions.csv>\n"
+            "  Or state the compromise explicitly:  indicant-md adjust --allow-no-actions",
+            file=sys.stderr,
+        )
+        return 1
+
+    if not actions:
+        print(
+            "WARNING: writing 'adjusted' with ZERO corporate actions. Every split "
+            "and bonus in this history is unadjusted, so any return spanning one "
+            "is fabricated. This is a development shortcut, not a valid dataset.",
+            file=sys.stderr,
+        )
+
     adjusted = adjust_all(prices, actions)
 
     years = sorted({d.year for d in adjusted["date"]})
@@ -354,6 +381,13 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("adjust", help="write the back-adjusted price dataset")
     p.add_argument("--from", dest="start", type=_iso, default=None)
     p.add_argument("--to", dest="end", type=_iso, default=None)
+    p.add_argument(
+        "--allow-no-actions",
+        action="store_true",
+        help="write 'adjusted' even with zero corporate actions loaded. "
+             "The output is then identical to raw prices and every split is "
+             "unadjusted — a development shortcut only.",
+    )
     p.set_defaults(func=cmd_adjust)
 
     p = sub.add_parser("universe", help="build and write the point-in-time universe")

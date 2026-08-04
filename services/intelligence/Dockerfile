@@ -7,6 +7,14 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
+# LightGBM links against the OpenMP runtime, which python:*-slim does not carry.
+# Without it the import fails at MODEL LOAD time, not at build time, so the
+# image builds clean and then crash-loops on startup with
+# "libgomp.so.1: cannot open shared object file".
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
 # Contracts first: it changes least often, so this layer stays cached across
 # ordinary service edits.
 COPY packages/contracts /app/packages/contracts

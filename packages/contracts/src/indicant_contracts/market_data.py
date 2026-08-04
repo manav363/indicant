@@ -41,6 +41,13 @@ class Series(StrEnum):
 
     BE/BZ are trade-for-trade (surveillance) series; SM/ST are SME platform.
     We keep them ingested but they are excluded from the eligible universe.
+
+    NSE publishes far more series codes than these — real bhavcopy files carry
+    GB (sovereign gold bonds), GS (government securities), N0-N9 (debentures),
+    IV, YR, E1, BL and others, and the list grows without notice. Enumerating
+    them all is a losing game, so `coerce` folds anything unrecognised into
+    OTHER rather than raising. A new instrument type appearing on the exchange
+    is not a reason for the ingest to fall over; it is a reason to not model it.
     """
 
     EQ = "EQ"
@@ -49,6 +56,16 @@ class Series(StrEnum):
     SM = "SM"
     ST = "ST"
     OTHER = "OTHER"
+
+    @classmethod
+    def coerce(cls, value: object) -> Series:
+        """Map any NSE series code to a member, never raising."""
+        if isinstance(value, cls):
+            return value
+        try:
+            return cls(str(value).strip().upper())
+        except (ValueError, AttributeError):
+            return cls.OTHER
 
 
 class ListingStatus(StrEnum):

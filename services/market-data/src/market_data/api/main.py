@@ -14,6 +14,7 @@ from datetime import date
 
 from fastapi import FastAPI, HTTPException, Query
 from indicant_contracts import (
+    Dataset,
     ErrorCode,
     ErrorEnvelope,
     QualityScore,
@@ -22,6 +23,7 @@ from indicant_contracts import (
     UniverseSnapshot,
 )
 
+from market_data._dates import as_date
 from market_data.ingest.calendar import TradingCalendarService
 from market_data.quality.quarantine import QuarantineStore
 from market_data.quality.scoring import QualityScorer
@@ -121,6 +123,69 @@ def symbol_quality(
 @app.get("/calendar/trading-days", response_model=TradingCalendar)
 def trading_days(start: date, end: date) -> TradingCalendar:
     return TradingCalendarService.from_file().build(start, end)
+
+
+# Bars beyond this and it stops being a chart request and starts being a bulk
+# read, which belongs on the data plane.
+MAX_HISTORY_BARS = 2000
+
+
+@app.get("/symbols/{symbol}/history")
+def symbol_history(
+    symbol: str,
+    start: date,
+    end: date,
+    adjusted: bool = True,
+) -> list[dict[str, object]]:
+    """Bounded OHLCV for ONE symbol, for drawing a chart.
+
+    This does not contradict the "no bulk OHLCV over JSON" rule. That rule
+    exists because a training panel is ~10^6 rows and serialising it is minutes
+    of waste — `intelligence` reads parquet directly for exactly that reason.
+
+    A chart is a different object: one symbol, a year, ~250 rows, ~25KB of JSON.
+    That is a control-plane-sized answer to a control-plane-sized question, and
+    the alternative — mounting the lake into the gateway — would give a
+    public-facing service filesystem access to the whole data plane to save
+    25KB. The row cap is what keeps the distinction from eroding.
+    """
+    settings = get_settings()
+    lake = Lake(settings.paths)
+
+    # Adjusted prices are the default: an unadjusted chart shows a fake -50%
+    # cliff on every split date, which a user reads as a crash.
+    dataset = Dataset.ADJUSTED if adjusted else Dataset.PRICES
+    if adjusted and not lake.has_data(Dataset.ADJUSTED):
+        dataset = Dataset.PRICES
+
+    frame = lake.read_prices(
+        symbols=[symbol.upper()], start=start, end=end, dataset=dataset
+    )
+    if frame.empty:
+        raise HTTPException(
+            status_code=404,
+            detail=ErrorEnvelope(
+                code=ErrorCode.DATA_UNAVAILABLE,
+                message=f"no rows for {symbol} in {start}..{end}",
+                user_message=f"We have no price history for {symbol.upper()} in that period.",
+                detail={"symbol": symbol.upper()},
+            ).model_dump(),
+        )
+
+    frame = frame.sort_values("date").tail(MAX_HISTORY_BARS)
+    return [
+        {
+            # ISO date, not str(Timestamp) — the latter yields
+            # "2025-08-04 00:00:00", which lightweight-charts rejects.
+            "time": as_date(row["date"]).isoformat(),
+            "open": float(row["open"]),
+            "high": float(row["high"]),
+            "low": float(row["low"]),
+            "close": float(row["close"]),
+            "volume": int(row["volume"]),
+        }
+        for _, row in frame.iterrows()
+    ]
 
 
 @app.get("/internal/quality/quarantine")

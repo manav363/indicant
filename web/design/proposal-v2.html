@@ -1,0 +1,717 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Indicant — Design Proposal v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,400..800&family=Inter:wght@300;400;500;600&family=IBM+Plex+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ==========================================================================
+   TOKENS — v2
+   Palette carried over from v1 (it was validated, and the validation still
+   holds). What changes in v2 is STRUCTURE and TYPE, which is what was
+   actually wrong.
+   ========================================================================== */
+:root{
+  --bg:#17181A; --bg-deep:#101113; --surface:#1E2023; --raised:#26282C; --inset:#131416;
+  --line:#2E3135; --line-soft:#24262A; --line-lit:#3A3E44;
+  --text:#E8E6E3; --muted:#9B9A96; --faint:#6A6A67;
+
+  --up:#007928; --down:#d2736c; --flat:#6A6A67;
+  --up-lit:#12A03A; --down-lit:#E08A83;
+  --up-wash:rgba(0,121,40,.14); --down-wash:rgba(210,115,108,.16);
+  --accent:#3E8FD9; --accent-dim:rgba(62,143,217,.13);
+  --warn:#C8A15A;
+
+  /* THREE faces with distinct jobs — v1 used one superfamily for everything,
+     which is exactly why it read as plain. */
+  --display:"Archivo", system-ui, sans-serif;   /* headline + signature */
+  --sans:"Inter", system-ui, sans-serif;        /* everything read */
+  --mono:"IBM Plex Mono", ui-monospace, Menlo, monospace; /* data */
+
+  --e1:0 1px 2px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.03);
+  --e2:0 2px 6px rgba(0,0,0,.45), 0 8px 24px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.04);
+  --e3:0 4px 12px rgba(0,0,0,.5), 0 18px 48px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.055);
+}
+*{box-sizing:border-box}
+body{margin:0; background:var(--bg-deep); color:var(--text); font-family:var(--sans); font-size:14px; line-height:1.6; -webkit-font-smoothing:antialiased}
+h1,h2,h3{margin:0; font-family:var(--display); font-weight:700; letter-spacing:-.02em}
+p{margin:0}
+.num{font-family:var(--mono); font-variant-numeric:tabular-nums}
+.exp{font-family:var(--display); font-variation-settings:"wdth" 112}
+
+.doc{max-width:1520px; margin:0 auto; padding:44px 28px 100px}
+.eyebrow{font-family:var(--mono); font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); margin-bottom:12px}
+.doc__title{font-size:40px; font-variation-settings:"wdth" 108; margin-bottom:12px}
+.doc__sub{color:var(--muted); max-width:78ch; font-size:15.5px}
+
+.sect{margin:64px 0 0}
+.sect__n{font-family:var(--mono); font-size:11px; letter-spacing:.16em; color:var(--faint); margin-bottom:8px}
+.sect__t{font-size:24px; margin-bottom:8px; font-variation-settings:"wdth" 104}
+.sect__d{color:var(--muted); max-width:86ch; margin-bottom:24px}
+
+.callout{border-left:2px solid var(--accent); background:var(--accent-dim); padding:14px 18px; border-radius:0 5px 5px 0; margin:20px 0; font-size:14px}
+.callout--bad{border-left-color:var(--down); background:var(--down-wash)}
+.callout b{color:#fff}
+
+/* ---------- endpoint map ---------- */
+.epmap{border:1px solid var(--line); border-radius:6px; overflow:hidden; background:var(--surface)}
+.epgrp{border-bottom:1px solid var(--line)}
+.epgrp:last-child{border-bottom:0}
+.epgrp__h{display:flex; align-items:center; gap:12px; padding:11px 16px; background:var(--raised); border-bottom:1px solid var(--line)}
+.epgrp__name{font-family:var(--mono); font-size:12px; font-weight:600; letter-spacing:.06em}
+.epgrp__count{font-family:var(--mono); font-size:10.5px; color:var(--faint)}
+.ep{display:grid; grid-template-columns:56px 300px 1fr 128px; gap:14px; align-items:center; padding:8px 16px; border-bottom:1px solid var(--line-soft); font-size:12.5px}
+.ep:last-child{border-bottom:0}
+.ep__m{font-family:var(--mono); font-size:10px; color:var(--faint); border:1px solid var(--line-lit); border-radius:3px; padding:1px 0; text-align:center}
+.ep__p{font-family:var(--mono); font-size:12px}
+.ep__w{color:var(--muted); font-size:12.5px}
+.ep__s{font-family:var(--mono); font-size:10px; letter-spacing:.08em; text-align:right}
+.s-live{color:var(--up-lit)}
+.s-dead{color:var(--down-lit)}
+.s-int{color:var(--warn)}
+.ep.is-dead .ep__p{color:var(--down-lit)}
+.ep.is-dead{background:rgba(210,115,108,.045)}
+
+.tally{display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin:22px 0}
+.tally__c{border:1px solid var(--line); border-radius:6px; padding:14px 16px; background:var(--surface)}
+.tally__n{font-family:var(--display); font-size:32px; font-weight:700; line-height:1; font-variation-settings:"wdth" 110}
+.tally__l{font-family:var(--mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--faint); margin-top:7px}
+
+/* ---------- wireframes ---------- */
+.wf{display:grid; grid-template-columns:1fr 1fr; gap:20px}
+.wf__c{border:1px solid var(--line); border-radius:6px; overflow:hidden}
+.wf__h{padding:10px 15px; font-family:var(--mono); font-size:10.5px; letter-spacing:.13em; text-transform:uppercase; border-bottom:1px solid var(--line)}
+.wf__h--old{background:var(--down-wash); color:var(--down-lit)}
+.wf__h--new{background:var(--accent-dim); color:var(--accent)}
+pre.ascii{margin:0; padding:16px; font-family:var(--mono); font-size:11px; line-height:1.5; color:var(--muted); background:var(--inset); overflow-x:auto}
+
+/* ==========================================================================
+   THE APP
+   ========================================================================== */
+.app{position:relative; background:var(--bg); border:1px solid var(--line); border-radius:9px; overflow:hidden; box-shadow:var(--e3); margin-bottom:14px}
+.app::before{content:""; position:absolute; inset:0; pointer-events:none; z-index:0;
+  background:radial-gradient(1100px 500px at 10% -10%, rgba(62,143,217,.05), transparent 60%),
+             radial-gradient(700px 400px at 100% 110%, rgba(0,0,0,.4), transparent 60%)}
+.app::after{content:""; position:absolute; inset:0; pointer-events:none; z-index:0; opacity:.15;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='130' height='130'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='130' height='130' filter='url(%23n)' opacity='.4'/%3E%3C/svg%3E")}
+.app > *{position:relative; z-index:1}
+
+/* ===== THE SIGNATURE: the provenance chain rail ===== */
+.chain{display:flex; align-items:stretch; background:linear-gradient(180deg,#212327,var(--surface)); border-bottom:1px solid var(--line)}
+.chain__brand{display:flex; align-items:center; gap:9px; padding:0 18px; border-right:1px solid var(--line);
+  font-family:var(--display); font-weight:700; font-size:14px; letter-spacing:.01em; font-variation-settings:"wdth" 108}
+.node{position:relative; flex:1; padding:11px 16px 11px 26px; border-right:1px solid var(--line-soft); cursor:pointer; transition:background .15s; min-width:0}
+.node:hover{background:rgba(255,255,255,.022)}
+.node.is-active{background:var(--accent-dim); box-shadow:inset 0 -2px 0 var(--accent)}
+/* the chevron that makes it read as a directed pipeline, not tabs */
+.node::before{content:""; position:absolute; left:-1px; top:50%; width:12px; height:12px; transform:translateY(-50%) rotate(45deg);
+  border-top:1px solid var(--line-soft); border-right:1px solid var(--line-soft); background:var(--bg); z-index:2}
+.node:first-of-type::before{display:none}
+.node__i{font-family:var(--mono); font-size:9px; color:var(--faint); letter-spacing:.1em}
+.node__n{font-family:var(--mono); font-size:11px; letter-spacing:.13em; text-transform:uppercase; margin-top:2px}
+.node__v{font-family:var(--mono); font-size:13px; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.node__b{height:2px; margin-top:6px; border-radius:1px; background:var(--line); overflow:hidden}
+.node__b i{display:block; height:100%; border-radius:1px}
+
+/* ===== command ===== */
+.cmd{display:flex; align-items:center; gap:14px; padding:14px 20px; border-bottom:1px solid var(--line)}
+.srch{flex:0 1 360px; display:flex; align-items:center; gap:10px; background:var(--inset); border:1px solid var(--line); border-radius:5px; padding:9px 13px; box-shadow:inset 0 1px 3px rgba(0,0,0,.45)}
+.srch span{color:var(--accent); font-family:var(--mono)}
+.srch input{flex:1; background:none; border:0; outline:0; color:var(--text); font-family:var(--mono); font-size:13.5px; letter-spacing:.04em}
+.kbd{font-family:var(--mono); font-size:10px; color:var(--faint); border:1px solid var(--line-lit); border-radius:3px; padding:2px 6px}
+.seg{display:flex; background:var(--inset); border:1px solid var(--line); border-radius:5px; padding:3px; gap:2px}
+.seg button{font-family:var(--mono); font-size:11.5px; color:var(--muted); background:none; border:0; padding:6px 12px; border-radius:3px; cursor:pointer}
+.seg button[aria-current]{background:linear-gradient(180deg,#33373D,#2A2D32); color:var(--text); box-shadow:var(--e1)}
+.cmd__r{margin-left:auto; display:flex; align-items:baseline; gap:14px}
+.cmd__sym{font-family:var(--display); font-size:24px; font-weight:700; font-variation-settings:"wdth" 110; letter-spacing:.01em}
+.cmd__px{font-family:var(--mono); font-size:20px}
+.cmd__chg{font-family:var(--mono); font-size:13px}
+
+/* ===== THE CALL — verdict is the LEAD, full width, not a sidebar ===== */
+.lead{display:grid; grid-template-columns:1fr 316px; gap:0; border-bottom:1px solid var(--line)}
+.lead__main{padding:26px 24px 24px; border-right:1px solid var(--line)}
+.finding{display:flex; align-items:flex-start; gap:28px; flex-wrap:wrap}
+.finding__word{font-family:var(--display); font-size:76px; font-weight:800; line-height:.92; letter-spacing:-.035em; font-variation-settings:"wdth" 118}
+.finding__sub{font-family:var(--mono); font-size:10.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--muted); margin-top:8px}
+.finding__r{flex:1; min-width:300px}
+.finding__say{font-size:19px; line-height:1.45; font-weight:300}
+.finding__say b{font-family:var(--mono); font-weight:600; font-size:21px}
+.finding__hedge{font-size:13px; color:var(--muted); margin-top:10px; border-left:2px solid var(--line-lit); padding-left:12px; max-width:56ch}
+
+/* dial, carried from v1 — it survived review */
+.dial{margin-top:24px}
+.dial__s{position:relative; height:86px}
+.dial__rb{position:relative; height:26px}
+.dial__rd{position:absolute; top:0; transform:translateX(-50%); font-family:var(--mono); font-size:12.5px; font-weight:600; padding:1px 8px; border-radius:3px; background:var(--raised); border:1px solid var(--line-lit); box-shadow:var(--e1); white-space:nowrap}
+.dial__tr{position:absolute; left:0; right:0; top:26px; height:22px; border-radius:2px; background:var(--inset); border:1px solid var(--line); box-shadow:inset 0 1px 4px rgba(0,0,0,.55)}
+.dial__z{position:absolute; top:27px; height:20px; display:flex; align-items:center}
+.dial__z--s{left:1px; width:45%; background:repeating-linear-gradient(-45deg,var(--down-wash),var(--down-wash) 3px,transparent 3px,transparent 7px); padding-left:8px}
+.dial__z--b{right:1px; width:45%; background:repeating-linear-gradient(45deg,var(--up-wash),var(--up-wash) 3px,transparent 3px,transparent 7px); justify-content:flex-end; padding-right:8px}
+.dial__zl{font-family:var(--mono); font-size:9px; letter-spacing:.12em; color:var(--muted)}
+.dial__tk{position:absolute; top:22px; width:1px; height:30px; background:var(--line-lit)}
+.dial__tk--m{background:var(--text); opacity:.55; height:38px; top:18px}
+.dial__nd{position:absolute; top:26px; width:2px; height:30px; background:var(--text); box-shadow:0 0 10px rgba(232,230,227,.6); transform:translateX(-1px)}
+.dial__nd::before{content:""; position:absolute; top:-5px; left:-3.5px; border-left:4.5px solid transparent; border-right:4.5px solid transparent; border-top:6px solid var(--text)}
+.dial__tl{position:absolute; top:56px; font-family:var(--mono); font-size:9px; color:var(--faint)}
+.callstrip{display:grid; grid-template-columns:repeat(5,1fr); gap:1px; margin-top:26px;
+  background:var(--line); border:1px solid var(--line); border-radius:5px; overflow:hidden}
+.cs{background:var(--surface); padding:11px 14px; display:flex; flex-direction:column; gap:4px}
+.cs__k{font-family:var(--mono); font-size:9px; letter-spacing:.15em; text-transform:uppercase; color:var(--faint)}
+.cs__v{font-family:var(--mono); font-size:14px}
+.cs__v em{font-style:normal; font-size:10.5px; color:var(--faint)}
+.dial__cap{position:absolute; top:70px; left:0; right:0; text-align:center; font-family:var(--mono); font-size:8.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--faint)}
+
+/* ===== PROVENANCE rail — data that had no UI at all ===== */
+.prov{padding:20px; background:linear-gradient(180deg,rgba(62,143,217,.035),transparent 40%)}
+.plab{font-family:var(--mono); font-size:9.5px; letter-spacing:.18em; text-transform:uppercase; color:var(--faint); display:flex; align-items:center; gap:10px; margin-bottom:12px}
+.plab::after{content:""; flex:1; height:1px; background:var(--line)}
+.pr{display:flex; justify-content:space-between; gap:10px; padding:6px 0; font-size:12.5px; border-bottom:1px solid var(--line-soft)}
+.pr:last-of-type{border-bottom:0}
+.pr__k{color:var(--faint); font-family:var(--mono); font-size:10.5px; letter-spacing:.06em}
+.pr__v{font-family:var(--mono); font-size:12px; text-align:right}
+.qbars{margin-top:12px; display:flex; flex-direction:column; gap:7px}
+.qb{display:grid; grid-template-columns:1fr 42px; gap:9px; align-items:center}
+.qb__l{font-size:10.5px; color:var(--muted)}
+.qb__t{grid-column:1/-1; height:4px; background:var(--inset); border:1px solid var(--line-soft); border-radius:2px; overflow:hidden}
+.qb__t i{display:block; height:100%; background:var(--up)}
+.qb__v{font-family:var(--mono); font-size:10.5px; text-align:right; color:var(--muted)}
+.verdict-chip{display:inline-flex; align-items:center; gap:7px; margin-top:14px; padding:6px 11px; border-radius:4px; font-family:var(--mono); font-size:11px; border:1px solid rgba(0,121,40,.45); background:var(--up-wash); color:var(--up-lit)}
+
+/* ===== evidence blocks ===== */
+.ev{padding:20px 24px; border-bottom:1px solid var(--line)}
+.ev__h{display:flex; align-items:center; gap:12px; margin-bottom:14px}
+.ev__n{font-family:var(--mono); font-size:9.5px; letter-spacing:.18em; text-transform:uppercase; color:var(--faint)}
+.ev__r{flex:1; height:1px; background:var(--line)}
+.ev__m{font-family:var(--mono); font-size:10.5px; color:var(--faint)}
+.chartbox{background:linear-gradient(180deg,var(--inset),#101114); border:1px solid var(--line); border-radius:5px; padding:4px; box-shadow:inset 0 1px 4px rgba(0,0,0,.5)}
+
+.drv{display:grid; grid-template-columns:repeat(3,1fr); gap:14px}
+.dcard{border:1px solid var(--line); border-radius:5px; padding:13px 15px; background:var(--surface)}
+.dcard__t{display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--muted); line-height:1.35}
+.dcard__v{font-family:var(--mono); font-size:14px; margin-top:8px}
+.dcard__b{height:5px; background:var(--inset); border:1px solid var(--line-soft); border-radius:2px; margin-top:10px; overflow:hidden}
+.dcard__b i{display:block; height:100%}
+.dcard__s{font-family:var(--mono); font-size:9.5px; color:var(--faint); margin-top:6px}
+
+/* ===== tables ===== */
+table.t{width:100%; border-collapse:collapse}
+table.t th{font-family:var(--mono); font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--faint); font-weight:500; text-align:right; padding:0 12px 9px; border-bottom:1px solid var(--line)}
+table.t th:first-child,table.t th:nth-child(2){text-align:left}
+table.t td{padding:9px 12px; border-bottom:1px solid var(--line-soft); text-align:right; font-size:13px}
+table.t td:first-child,table.t td:nth-child(2){text-align:left}
+table.t tbody tr:hover{background:var(--raised)}
+table.t tbody tr.is-cur{background:var(--accent-dim); box-shadow:inset 2px 0 0 var(--accent)}
+.sym{font-family:var(--mono); font-size:13px; font-weight:500}
+.track{position:relative; display:inline-block; width:110px; height:7px; background:var(--inset); border:1px solid var(--line-soft); border-radius:2px; vertical-align:middle}
+.track i{position:absolute; top:0; bottom:0; border-radius:1px}
+.track u{position:absolute; left:50%; top:-2px; bottom:-2px; width:1px; background:var(--line-lit)}
+
+.foot{display:flex; justify-content:space-between; padding:11px 20px; border-top:1px solid var(--line); background:var(--bg-deep); font-size:11.5px; color:var(--faint)}
+
+/* gate/universe/model screens */
+.grid3{display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--line)}
+.cell{background:var(--bg); padding:18px 20px}
+.cell__k{font-family:var(--mono); font-size:9.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--faint)}
+.cell__v{font-family:var(--display); font-size:34px; font-weight:700; font-variation-settings:"wdth" 108; line-height:1.1; margin-top:6px}
+.cell__s{font-family:var(--mono); font-size:11px; color:var(--muted); margin-top:4px}
+
+.tierlist{display:flex; flex-direction:column; gap:0}
+.tier{display:grid; grid-template-columns:26px 128px 1fr 90px; gap:14px; align-items:center; padding:11px 0; border-bottom:1px solid var(--line-soft); font-size:12.5px}
+.tier__n{font-family:var(--mono); font-size:11px; color:var(--faint)}
+.tier__t{font-family:var(--mono); font-size:12px; letter-spacing:.05em}
+.tier__d{color:var(--muted); font-size:12.5px}
+.tier__s{font-family:var(--mono); font-size:11px; text-align:right}
+
+.bars{display:flex; flex-direction:column; gap:9px}
+.exb{display:grid; grid-template-columns:1fr 54px; gap:12px; align-items:center; font-size:12.5px}
+.exb__l{color:var(--muted)}
+.exb__t{grid-column:1/-1; height:6px; background:var(--inset); border:1px solid var(--line-soft); border-radius:2px; overflow:hidden}
+.exb__t i{display:block; height:100%; background:var(--down); opacity:.8}
+.exb__v{font-family:var(--mono); font-size:11.5px; text-align:right; color:var(--muted)}
+
+@media(max-width:1200px){.wf,.drv,.grid3{grid-template-columns:1fr}.lead{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="doc">
+
+<header style="border-bottom:1px solid var(--line); padding-bottom:28px">
+  <div class="eyebrow">Design proposal v2 · endpoint-driven</div>
+  <h1 class="doc__title">The product is bigger than the screen</h1>
+  <p class="doc__sub">
+    You were right about v1 — I changed the paint and kept the skeleton. So this time I started by
+    marking every endpoint. That turned up the actual problem: <strong>the UI consumes 4 of 24 routes.</strong>
+    The six-tier quality gate, the point-in-time universe, corporate-action lineage, the model card
+    and coverage reconciliation are all built and tested, and none of them has ever been drawn.
+    v2 is a new information architecture derived from that map.
+  </p>
+</header>
+
+<!-- ================= 01 ENDPOINT MAP ================= -->
+<section class="sect">
+  <div class="sect__n">01 — ENDPOINT MAP</div>
+  <h2 class="sect__t">All 24 routes, marked</h2>
+  <p class="sect__d">Every route across the four services. <span class="s-live">LIVE</span> = the current
+  UI calls it. <span class="s-dead">NO UI</span> = built, tested, returns real data, never drawn.
+  <span class="s-int">INTERNAL</span> = deliberately not public (nginx 404s <span class="num">/internal/</span>),
+  so it needs an authenticated operator view rather than a page.</p>
+
+  <div class="tally">
+    <div class="tally__c"><div class="tally__n">24</div><div class="tally__l">Routes total</div></div>
+    <div class="tally__c"><div class="tally__n" style="color:var(--up-lit)">4</div><div class="tally__l">Reachable in the UI</div></div>
+    <div class="tally__c"><div class="tally__n" style="color:var(--down-lit)">13</div><div class="tally__l">Built · no UI</div></div>
+    <div class="tally__c"><div class="tally__n" style="color:var(--warn)">3</div><div class="tally__l">Internal / operator</div></div>
+    <div class="tally__c"><div class="tally__n" style="color:var(--faint)">4</div><div class="tally__l">Health probes</div></div>
+  </div>
+
+  <div class="epmap">
+    <div class="epgrp">
+      <div class="epgrp__h"><span class="epgrp__name">gateway</span><span class="epgrp__count">public · 7 routes</span></div>
+      <div class="ep"><span class="ep__m">GET</span><span class="ep__p">/api/stock/{symbol}</span><span class="ep__w">Composed stock screen — candles, prediction, regime, meta</span><span class="ep__s s-live">LIVE</span></div>
+      <div class="ep"><span class="ep__m">GET</span><span class="ep__p">/api/search</span><span class="ep__w">Type-ahead over the eligible universe + reasons for near-misses</span><span class="ep__s s-live">LIVE</span></div>
+      <div class="ep"><span class="ep__m">GET</span><span class="ep__p">/api/screen</span><span class="ep__w">Ranked table over the training universe</span><span class="ep__s s-live">LIVE</span></div>
+      <div class="ep"><span class="ep__m">GET</span><span class="ep__p">/api/market</span><span class="ep__w">Market pulse — regime, lake freshness, model standing</span><span class="ep__s s-live">LIVE</span></div>
+      <div class="ep is-dead"><span class="ep__m">GET</span><span class="ep__p">/api/universe</span><span class="ep__w">Full PIT universe with exclusion reasons</span><span class="ep__s s-dead">NO UI</span></div>
+      <div class="ep is-dead"><span class="ep__m">GET</span><span class="ep__p">/api/predict/{symbol}</span><span class="ep__w">Prediction + rendered narrative, standalone</span><span class="ep__s s-dead">NO UI</span></div>
+      <div class="ep"><span class="ep__m">GET</span><span class="ep__p">/health</span><span class="ep__w">Upstream reachability roll-up</span><span class="ep__s" style="color:var(--faint)">PROBE</span></div>
+    </div>
+
+    <div class="epgrp">
+      <div class="epgrp__h"><span class="epgrp__name">market-data</span><span class="epgrp__count">internal · 9 routes</span></div>
+      <div class="ep"><span class="ep__m">GET</span><span class="ep__p">/symbols/{symbol}/history</span><span class="ep__w">Bounded OHLCV for a chart</span><span class="ep__s s-live">via gateway</span></div>
+      <div class="ep is-dead"><span class="ep__m">GET</span><span class="ep__p">/symbols/{symbol}/meta</span><span class="ep__w">ISIN · series · listing status · first/last seen · delisted date</span><span class="ep__s s-dead">NO UI</span></div>
+      <div class="ep is-dead"><span class="ep__m">GET</span><span class="ep__p">/symbols/{symbol}/quality</span><span class="ep__w">5-component quality score + history days + median turnover</span><span class="ep__s s-dead">NO UI</span></div>
+      <div class="ep is-dead"><span class="ep__m">GET</span><span class="ep__p">/universe</span><span class="ep__w">3,066 symbols → 897 eligible, 2,169 excluded WITH reasons</span><span class="ep__s s-dead">NO UI</span></div>
+      <div class="ep is-dead"><span class="ep__m">GET</span><span class="ep__p">/calendar/trading-days</span><span class="ep__w">NSE trading calendar for a range</span><span class="ep__s s-dead">NO UI</span></div>
+      <div class="ep"><span class="ep__m">GET</span><span class="ep__p">/internal/quality/coverage</span><span class="ep__w">Predicted vs observed days — 99.15%, 10 missing</span><span class="ep__s s-int">OPERATOR</span></div>
+      <div class="ep"><span class="ep__m">GET</span><span class="ep__p">/internal/quality/runs</span><span class="ep__w">Per-rule gate results with evidence</span><span class="ep__s s-int">OPERATOR</span></div>
+      <div class="ep"><span class="ep__m">GET</span><span class="ep__p">/internal/quality/quarantine</span><span class="ep__w">Rows held, by the rule that rejected them</span><span class="ep__s s-int">OPERATOR</span></div>
+      <div class="ep"><span class="ep__m">GET</span><span class="ep__p">/health</span><span class="ep__w">Lake state — has_data, trading_days, first/last date</span><span class="ep__s s-live">via gateway</span></div>
+    </div>
+
+    <div class="epgrp">
+      <div class="epgrp__h"><span class="epgrp__name">intelligence</span><span class="epgrp__count">internal · 7 routes</span></div>
+      <div class="ep"><span class="ep__m">GET</span><span class="ep__p">/predict</span><span class="ep__w">Probability, SHAP facts, regime, sizing</span><span class="ep__s s-live">via gateway</span></div>
+      <div class="ep"><span class="ep__m">GET</span><span class="ep__p">/screen</span><span class="ep__w">Ranked universe</span><span class="ep__s s-live">via gateway</span></div>
+      <div class="ep"><span class="ep__m">GET</span><span class="ep__p">/regime/market</span><span class="ep__w">Breadth — bull 8 / ranging 11 / bear 10, 29 of 30 reporting</span><span class="ep__s s-live">partial</span></div>
+      <div class="ep is-dead"><span class="ep__m">GET</span><span class="ep__p">/regime/{symbol}</span><span class="ep__w">Per-stock regime</span><span class="ep__s s-dead">NO UI</span></div>
+      <div class="ep is-dead"><span class="ep__m">GET</span><span class="ep__p">/model/current</span><span class="ep__w">run_id · 94 features · universe 30 · p-value · significance</span><span class="ep__s s-dead">NO UI</span></div>
+      <div class="ep is-dead"><span class="ep__m">GET</span><span class="ep__p">/universe/eligible</span><span class="ep__w">Eligible symbols as of a date</span><span class="ep__s s-dead">NO UI</span></div>
+      <div class="ep"><span class="ep__m">GET</span><span class="ep__p">/health</span><span class="ep__w">model_trained, run_id, p_value, load-failure reason</span><span class="ep__s" style="color:var(--faint)">PROBE</span></div>
+    </div>
+  </div>
+
+  <div class="callout callout--bad">
+    <b>The thing worth noticing:</b> the endpoints with no UI are the ones that make this project
+    unlike a stock-tip app. Anyone can show a chart and a BUY badge. Almost nobody can show you
+    <em>why a stock is even allowed into the model</em>, what the gate rejected, and how complete the
+    underlying record is. That evidence is fully built here — and completely invisible.
+  </div>
+</section>
+
+<!-- ================= 02 IA ================= -->
+<section class="sect">
+  <div class="sect__n">02 — INFORMATION ARCHITECTURE</div>
+  <h2 class="sect__t">Make the pipeline the interface</h2>
+  <p class="sect__d">
+    v1 (and the current build) is the generic terminal layout: chart left, panel right, table below.
+    Every trading product ships it — which is the tell that it is a default, not a decision.
+    v2 organises the app around the chain the data actually travels, so each stage is a place you can
+    stand, and a prediction can be walked <em>backwards</em> to the government file it came from.
+  </p>
+
+  <div class="wf">
+    <div class="wf__c">
+      <div class="wf__h wf__h--old">v1 — a reskin. same skeleton.</div>
+<pre class="ascii">┌────────────────────────────────────────┐
+│ status strip                           │
+├────────────────────────────────────────┤
+│ [search]  [1M 3M 6M 12M]      TICKER   │
+├──────────────────────────┬─────────────┤
+│                          │  verdict    │
+│        chart             │  (sidebar)  │
+│                          │  drivers    │
+├──────────────────────────┴─────────────┤
+│ screener table                         │
+└────────────────────────────────────────┘
+ 4 endpoints. one screen. everything
+ else in the product is unreachable.</pre>
+    </div>
+    <div class="wf__c">
+      <div class="wf__h wf__h--new">v2 — the chain is the spine</div>
+<pre class="ascii">┌────────────────────────────────────────┐
+│ ①SOURCE ▸②GATE ▸③UNIVERSE ▸④MODEL ▸⑤CALL│  ← always visible,
+│  1,166d   99.15%  897/3066  p=.0597  RELI│    each live + clickable
+├────────────────────────────────────────┤
+│ [search]  [1M 3M 6M 12M]   RELIANCE ₹.. │
+├──────────────────────────┬─────────────┤
+│  HOLD  0.512             │ PROVENANCE  │  ← verdict LEADS
+│  ├──── dial ────┤        │ isin/series │    (was a sidebar)
+│  "51%, and 49 of 100..." │ quality ▓▓▓ │  ← new data,
+├──────────────────────────┤ turnover    │    no UI before
+│ EVIDENCE · PRICE         │ eligible ✓  │
+│   [ candles ]            │ why: ...    │
+├──────────────────────────┴─────────────┤
+│ EVIDENCE · DRIVERS   [3 cards]         │
+├────────────────────────────────────────┤
+│ RANKED UNIVERSE                        │
+└────────────────────────────────────────┘</pre>
+    </div>
+  </div>
+
+  <div class="callout">
+    <b>The signature is the chain rail.</b> Not decoration — it is the product's argument as a
+    navigation element. Every node shows its live state, and clicking one opens that stage. It is the
+    one thing here that could not be lifted onto another trading app, because no other trading app
+    can fill it in.
+  </div>
+
+  <p class="sect__d" style="margin-top:20px">
+    <strong>Type also changed, and that matters more than it sounds.</strong> v1 used one superfamily
+    (IBM Plex) for every role, which is precisely why it read flat. v2 gives three faces distinct jobs:
+    <span class="exp" style="font-weight:700">Archivo</span> — a wide-cut grotesque — for display and
+    the verdict; Inter for everything read; IBM Plex Mono for data. The verdict now sets at 76px in a
+    112-wide cut against 9px mono labels.
+  </p>
+</section>
+
+<!-- ================= 03 SCREEN: THE CALL ================= -->
+<section class="sect">
+  <div class="sect__n">03 — SCREEN ⑤ · THE CALL</div>
+  <h2 class="sect__t">Verdict leads, chart becomes evidence, provenance gets a rail</h2>
+  <p class="sect__d">Real RELIANCE data, 2026-07-30. The right rail is entirely new — it renders
+  <span class="num">/symbols/{s}/meta</span> and <span class="num">/symbols/{s}/quality</span>, which had no UI.</p>
+
+  <div class="app">
+    <!-- chain -->
+    <nav class="chain">
+      <div class="chain__brand">INDICANT</div>
+      <div class="node"><div class="node__i">① SOURCE</div><div class="node__n">Bhavcopy</div><div class="node__v">1,166 <span style="color:var(--faint)">days</span></div><div class="node__b"><i style="width:99%;background:var(--up)"></i></div></div>
+      <div class="node"><div class="node__i">② GATE</div><div class="node__n">Quality</div><div class="node__v">99.15% <span style="color:var(--faint)">cov</span></div><div class="node__b"><i style="width:99.15%;background:var(--up)"></i></div></div>
+      <div class="node"><div class="node__i">③ UNIVERSE</div><div class="node__n">Eligible</div><div class="node__v">897 <span style="color:var(--faint)">/ 3,066</span></div><div class="node__b"><i style="width:29%;background:var(--accent)"></i></div></div>
+      <div class="node"><div class="node__i">④ MODEL</div><div class="node__n">Standing</div><div class="node__v" style="color:var(--warn)">p=0.0597</div><div class="node__b"><i style="width:41%;background:var(--warn)"></i></div></div>
+      <div class="node is-active"><div class="node__i">⑤ CALL</div><div class="node__n">RELIANCE</div><div class="node__v">HOLD <span style="color:var(--faint)">0.512</span></div><div class="node__b"><i style="width:51%;background:var(--flat)"></i></div></div>
+    </nav>
+
+    <div class="cmd">
+      <div class="srch"><span>&gt;</span><input value="RELIANCE" aria-label="Search"><span class="kbd">⌘K</span></div>
+      <div class="seg"><button>1M</button><button>3M</button><button aria-current="true">6M</button><button>12M</button></div>
+      <div class="cmd__r">
+        <span class="cmd__sym">RELIANCE</span><span class="cmd__px">₹1,292.90</span>
+        <span class="cmd__chg" style="color:var(--down-lit)">▼ −0.66%</span>
+      </div>
+    </div>
+
+    <div class="lead">
+      <div class="lead__main">
+        <div class="finding">
+          <div>
+            <div class="finding__word">HOLD</div>
+            <div class="finding__sub">weak · 6 month horizon</div>
+          </div>
+          <div class="finding__r">
+            <p class="finding__say"><b>51%</b> chance of being higher in six months.</p>
+            <p class="finding__hedge">Not a promise — about <strong>49 of every 100</strong> calls like this
+            went the other way. The reading sits almost exactly on the coin-flip line, and the model as a
+            whole is not yet distinguishable from chance.</p>
+          </div>
+        </div>
+
+        <div class="dial">
+          <div class="dial__s">
+            <div class="dial__rb"><span class="dial__rd" style="left:51.18%">0.512</span></div>
+            <div class="dial__tr"></div>
+            <div class="dial__z dial__z--s"><span class="dial__zl">SELL &lt; .45</span></div>
+            <div class="dial__z dial__z--b"><span class="dial__zl">.55 &gt; BUY</span></div>
+            <div class="dial__tk" style="left:45%"></div><div class="dial__tk" style="left:55%"></div>
+            <div class="dial__tk dial__tk--m" style="left:50%"></div>
+            <div class="dial__nd" style="left:51.18%"></div>
+            <div class="dial__tl" style="left:0">0.00</div>
+            <div class="dial__tl" style="left:50%; transform:translateX(-50%)">coin flip</div>
+            <div class="dial__tl" style="right:0">1.00</div>
+            <div class="dial__cap">probability the stock is higher in 6 months</div>
+          </div>
+        </div>
+
+        <div class="callstrip">
+          <div class="cs"><span class="cs__k">Price</span><span class="cs__v">₹1,292.90</span></div>
+          <div class="cs"><span class="cs__k">Confidence</span><span class="cs__v">51.2%</span></div>
+          <div class="cs"><span class="cs__k">Suggested size</span><span class="cs__v">0.00% <em>no position</em></span></div>
+          <div class="cs"><span class="cs__k">Regime</span><span class="cs__v">ranging</span></div>
+          <div class="cs"><span class="cs__k">Model run</span><span class="cs__v">20260801_231b</span></div>
+        </div>
+
+        <div class="ev__h" style="margin-top:24px">
+          <span class="ev__n">Evidence · price</span><span class="ev__r"></span>
+          <span class="ev__m">90 sessions · split &amp; bonus adjusted</span>
+        </div>
+        <div class="chartbox"><svg id="chart" viewBox="0 0 1180 400" width="100%" role="img" aria-label="RELIANCE daily candles"></svg></div>
+      </div>
+
+      <aside class="prov">
+        <div class="plab">Provenance</div>
+        <div class="pr"><span class="pr__k">ISIN</span><span class="pr__v">INE002A01018</span></div>
+        <div class="pr"><span class="pr__k">Series</span><span class="pr__v">EQ</span></div>
+        <div class="pr"><span class="pr__k">Status</span><span class="pr__v" style="color:var(--up-lit)">listed</span></div>
+        <div class="pr"><span class="pr__k">First seen</span><span class="pr__v">2022-01-03</span></div>
+        <div class="pr"><span class="pr__k">Last seen</span><span class="pr__v">2026-07-30</span></div>
+        <div class="pr"><span class="pr__k">History</span><span class="pr__v">1,166 d</span></div>
+        <div class="pr"><span class="pr__k">Median turnover</span><span class="pr__v">₹1,504 cr</span></div>
+
+        <div class="plab" style="margin-top:20px">Quality score</div>
+        <div class="qbars">
+          <div class="qb"><span class="qb__l">History completeness</span><span class="qb__v">1.00</span><span class="qb__t"><i style="width:100%"></i></span></div>
+          <div class="qb"><span class="qb__l">Validity clean rate</span><span class="qb__v">1.00</span><span class="qb__t"><i style="width:100%"></i></span></div>
+          <div class="qb"><span class="qb__l">Continuity clean rate</span><span class="qb__v">1.00</span><span class="qb__t"><i style="width:100%"></i></span></div>
+          <div class="qb"><span class="qb__l">Liquidity adequacy</span><span class="qb__v">1.00</span><span class="qb__t"><i style="width:100%"></i></span></div>
+          <div class="qb"><span class="qb__l">Recency</span><span class="qb__v">1.00</span><span class="qb__t"><i style="width:100%"></i></span></div>
+        </div>
+        <div class="verdict-chip">✓ eligible — passes all five gates</div>
+
+        <div class="plab" style="margin-top:22px">Refused nearby</div>
+        <p style="font-size:11.5px; color:var(--faint); line-height:1.65">
+          <span class="num" style="color:var(--down-lit)">RELCAPITAL</span> — has not traded recently<br>
+          <span class="num" style="color:var(--down-lit)">RELCHEMQ</span> — quality 0.81 below 0.85
+        </p>
+      </aside>
+    </div>
+
+    <div class="ev">
+      <div class="ev__h"><span class="ev__n">Why · drivers</span><span class="ev__r"></span><span class="ev__m">arrow = effect on forecast · bar = strength</span></div>
+      <div class="drv">
+        <div class="dcard">
+          <div class="dcard__t"><span style="color:var(--down-lit)">▼</span> delivery pct <span style="color:var(--faint)">(vs market)</span></div>
+          <div class="dcard__v">0th percentile</div>
+          <div class="dcard__b"><i style="width:100%;background:var(--down)"></i></div>
+          <div class="dcard__s">near the bottom of the market · shap −0.324</div>
+        </div>
+        <div class="dcard">
+          <div class="dcard__t"><span style="color:var(--up-lit)">▲</span> cumulative buying vs selling</div>
+          <div class="dcard__v">−20.0 crore</div>
+          <div class="dcard__b"><i style="width:81%;background:var(--up)"></i></div>
+          <div class="dcard__s">pushes the forecast up · shap +0.262</div>
+        </div>
+        <div class="dcard">
+          <div class="dcard__t"><span style="color:var(--down-lit)">▼</span> 6-month change <span style="color:var(--faint)">(vs market)</span></div>
+          <div class="dcard__v">24th percentile</div>
+          <div class="dcard__b"><i style="width:54%;background:var(--down)"></i></div>
+          <div class="dcard__s">shap −0.177</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ev" style="border-bottom:0">
+      <div class="ev__h"><span class="ev__n">Ranked universe</span><span class="ev__r"></span><span class="ev__m">30-symbol training universe · 6M</span></div>
+      <table class="t"><thead><tr><th>Symbol</th><th>Signal</th><th>P(up)</th><th>Edge</th><th>Price</th><th>Regime</th></tr></thead><tbody id="scb"></tbody></table>
+    </div>
+
+    <div class="foot"><span>Research output, not investment advice.</span><span class="num">direction = colour + glyph + label + position</span></div>
+  </div>
+</section>
+
+<!-- ================= 04 NEW SCREENS ================= -->
+<section class="sect">
+  <div class="sect__n">04 — SCREENS ②③④ · PREVIOUSLY UNREACHABLE</div>
+  <h2 class="sect__t">Three screens the endpoints already support</h2>
+  <p class="sect__d">All numbers below are live from the running stack. None of this has ever been rendered.</p>
+
+  <!-- GATE -->
+  <div class="app">
+    <nav class="chain">
+      <div class="chain__brand">INDICANT</div>
+      <div class="node"><div class="node__i">① SOURCE</div><div class="node__n">Bhavcopy</div><div class="node__v">1,166 <span style="color:var(--faint)">days</span></div><div class="node__b"><i style="width:99%;background:var(--up)"></i></div></div>
+      <div class="node is-active"><div class="node__i">② GATE</div><div class="node__n">Quality</div><div class="node__v">99.15% <span style="color:var(--faint)">cov</span></div><div class="node__b"><i style="width:99.15%;background:var(--up)"></i></div></div>
+      <div class="node"><div class="node__i">③ UNIVERSE</div><div class="node__n">Eligible</div><div class="node__v">897 <span style="color:var(--faint)">/ 3,066</span></div><div class="node__b"><i style="width:29%;background:var(--accent)"></i></div></div>
+      <div class="node"><div class="node__i">④ MODEL</div><div class="node__n">Standing</div><div class="node__v" style="color:var(--warn)">p=0.0597</div><div class="node__b"><i style="width:41%;background:var(--warn)"></i></div></div>
+      <div class="node"><div class="node__i">⑤ CALL</div><div class="node__n">RELIANCE</div><div class="node__v">HOLD <span style="color:var(--faint)">0.512</span></div><div class="node__b"><i style="width:51%;background:var(--flat)"></i></div></div>
+    </nav>
+    <div class="grid3">
+      <div class="cell"><div class="cell__k">Calendar coverage</div><div class="cell__v" style="color:var(--up-lit)">99.15%</div><div class="cell__s">1,166 observed of 1,176 expected</div></div>
+      <div class="cell"><div class="cell__k">Missing sessions</div><div class="cell__v">10</div><div class="cell__s">named, not swallowed</div></div>
+      <div class="cell"><div class="cell__k">Unexpected sessions</div><div class="cell__v">0</div><div class="cell__s">no phantom trading days</div></div>
+    </div>
+    <div class="ev">
+      <div class="ev__h"><span class="ev__n">The six tiers</span><span class="ev__r"></span><span class="ev__m">/internal/quality/runs</span></div>
+      <div class="tierlist">
+        <div class="tier"><span class="tier__n">1</span><span class="tier__t">STRUCTURAL</span><span class="tier__d">Columns, types, and the file shape itself</span><span class="tier__s" style="color:var(--up-lit)">pass</span></div>
+        <div class="tier"><span class="tier__n">2</span><span class="tier__t">VALIDITY</span><span class="tier__d">high ≥ low, prices &gt; 0, volume non-negative</span><span class="tier__s" style="color:var(--up-lit)">pass</span></div>
+        <div class="tier"><span class="tier__n">3</span><span class="tier__t">COMPLETENESS</span><span class="tier__d">Every expected symbol present on the day</span><span class="tier__s" style="color:var(--up-lit)">pass</span></div>
+        <div class="tier"><span class="tier__n">4</span><span class="tier__t">CONTINUITY</span><span class="tier__d">prev_close reconciles across corporate actions</span><span class="tier__s" style="color:var(--up-lit)">pass</span></div>
+        <div class="tier"><span class="tier__n">5</span><span class="tier__t">PLAUSIBILITY</span><span class="tier__d">Move and volume within believable bounds</span><span class="tier__s" style="color:var(--up-lit)">pass</span></div>
+        <div class="tier"><span class="tier__n">6</span><span class="tier__t">CROSS-SOURCE</span><span class="tier__d">Independent oracle agreement</span><span class="tier__s" style="color:var(--faint)">n/a</span></div>
+      </div>
+    </div>
+    <div class="ev" style="border-bottom:0">
+      <div class="ev__h"><span class="ev__n">Missing sessions</span><span class="ev__r"></span><span class="ev__m">shown, never silently filled</span></div>
+      <div style="display:flex; flex-wrap:wrap; gap:8px">
+        <span class="num" style="font-size:12px;padding:5px 10px;border:1px solid var(--line-lit);border-radius:4px;background:var(--surface)">2022-08-08</span>
+        <span class="num" style="font-size:12px;padding:5px 10px;border:1px solid var(--line-lit);border-radius:4px;background:var(--surface)">2022-08-09</span>
+        <span class="num" style="font-size:12px;padding:5px 10px;border:1px solid var(--line-lit);border-radius:4px;background:var(--surface)">2024-11-15</span>
+        <span class="num" style="font-size:12px;padding:5px 10px;border:1px solid var(--line-lit);border-radius:4px;background:var(--surface)">2025-02-26</span>
+        <span class="num" style="font-size:12px;padding:5px 10px;border:1px solid var(--line-lit);border-radius:4px;background:var(--surface)">2025-03-14</span>
+        <span class="num" style="font-size:12px;padding:5px 10px;border:1px solid var(--line-lit);border-radius:4px;background:var(--surface)">2025-03-31</span>
+        <span class="num" style="font-size:12px;padding:5px 10px;border:1px solid var(--line-lit);border-radius:4px;background:var(--surface)">2025-04-10</span>
+        <span class="num" style="font-size:12px;padding:5px 10px;border:1px solid var(--line-lit);border-radius:4px;background:var(--surface)">2025-04-14</span>
+        <span class="num" style="font-size:12px;padding:5px 10px;border:1px solid var(--line-lit);border-radius:4px;background:var(--surface)">2025-04-18</span>
+        <span class="num" style="font-size:12px;padding:5px 10px;border:1px solid var(--line-lit);border-radius:4px;background:var(--surface)">2025-08-27</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- UNIVERSE -->
+  <div class="app">
+    <nav class="chain">
+      <div class="chain__brand">INDICANT</div>
+      <div class="node"><div class="node__i">① SOURCE</div><div class="node__n">Bhavcopy</div><div class="node__v">1,166 <span style="color:var(--faint)">days</span></div><div class="node__b"><i style="width:99%;background:var(--up)"></i></div></div>
+      <div class="node"><div class="node__i">② GATE</div><div class="node__n">Quality</div><div class="node__v">99.15% <span style="color:var(--faint)">cov</span></div><div class="node__b"><i style="width:99.15%;background:var(--up)"></i></div></div>
+      <div class="node is-active"><div class="node__i">③ UNIVERSE</div><div class="node__n">Eligible</div><div class="node__v">897 <span style="color:var(--faint)">/ 3,066</span></div><div class="node__b"><i style="width:29%;background:var(--accent)"></i></div></div>
+      <div class="node"><div class="node__i">④ MODEL</div><div class="node__n">Standing</div><div class="node__v"><span style="color:var(--warn)">p=0.0597</span></div><div class="node__b"><i style="width:41%;background:var(--warn)"></i></div></div>
+      <div class="node"><div class="node__i">⑤ CALL</div><div class="node__n">RELIANCE</div><div class="node__v">HOLD <span style="color:var(--faint)">0.512</span></div><div class="node__b"><i style="width:51%;background:var(--flat)"></i></div></div>
+    </nav>
+    <div class="grid3">
+      <div class="cell"><div class="cell__k">Symbols seen</div><div class="cell__v">3,066</div><div class="cell__s">as of 2026-08-03</div></div>
+      <div class="cell"><div class="cell__k">Eligible</div><div class="cell__v" style="color:var(--up-lit)">897</div><div class="cell__s">29.3% — the model may score these</div></div>
+      <div class="cell"><div class="cell__k">Excluded</div><div class="cell__v" style="color:var(--down-lit)">2,169</div><div class="cell__s">every one with a stated reason</div></div>
+    </div>
+    <div class="ev" style="border-bottom:0">
+      <div class="ev__h"><span class="ev__n">③ Universe · why 2,169 stocks are refused</span><span class="ev__r"></span><span class="ev__m">/universe → excluded{}</span></div>
+      <p style="color:var(--muted); font-size:13px; margin-bottom:16px; max-width:80ch">
+        This is the honest version of "no stock falls back". The system does not silently guess on a
+        thinly-traded shell — it refuses, and tells you which floor was missed.
+      </p>
+      <div class="bars">
+        <div class="exb"><span class="exb__l">Has not traded recently — looks delisted or suspended</span><span class="exb__v">197</span><span class="exb__t"><i style="width:100%"></i></span></div>
+        <div class="exb"><span class="exb__l">Insufficient history — only 73 trading days</span><span class="exb__v">65</span><span class="exb__t"><i style="width:33%"></i></span></div>
+        <div class="exb"><span class="exb__l">Quality score 0.84 — below the 0.85 floor</span><span class="exb__v">43</span><span class="exb__t"><i style="width:22%"></i></span></div>
+        <div class="exb"><span class="exb__l">Quality score 0.83 — below the 0.85 floor</span><span class="exb__v">36</span><span class="exb__t"><i style="width:18%"></i></span></div>
+        <div class="exb"><span class="exb__l">Insufficient history — only 662 trading days</span><span class="exb__v">32</span><span class="exb__t"><i style="width:16%"></i></span></div>
+        <div class="exb"><span class="exb__l">Quality score 0.82 — below the 0.85 floor</span><span class="exb__v">28</span><span class="exb__t"><i style="width:14%"></i></span></div>
+      </div>
+      <div style="margin-top:20px; padding:14px 16px; background:var(--inset); border:1px solid var(--line); border-radius:5px">
+        <div class="num" style="font-size:11px; color:var(--faint); letter-spacing:.1em; margin-bottom:8px">SAMPLE REFUSALS</div>
+        <div class="num" style="font-size:12.5px; line-height:2">
+          <span style="color:var(--down-lit)">21STCENMGM</span> &nbsp;median daily turnover ₹140,000 is below the ₹10,000,000 liquidity floor<br>
+          <span style="color:var(--down-lit)">20MICRONS</span> &nbsp;data quality score 0.82 is below 0.85
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODEL -->
+  <div class="app">
+    <nav class="chain">
+      <div class="chain__brand">INDICANT</div>
+      <div class="node"><div class="node__i">① SOURCE</div><div class="node__n">Bhavcopy</div><div class="node__v">1,166 <span style="color:var(--faint)">days</span></div><div class="node__b"><i style="width:99%;background:var(--up)"></i></div></div>
+      <div class="node"><div class="node__i">② GATE</div><div class="node__n">Quality</div><div class="node__v">99.15% <span style="color:var(--faint)">cov</span></div><div class="node__b"><i style="width:99.15%;background:var(--up)"></i></div></div>
+      <div class="node"><div class="node__i">③ UNIVERSE</div><div class="node__n">Eligible</div><div class="node__v">897 <span style="color:var(--faint)">/ 3,066</span></div><div class="node__b"><i style="width:29%;background:var(--accent)"></i></div></div>
+      <div class="node is-active"><div class="node__i">④ MODEL</div><div class="node__n">Standing</div><div class="node__v"><span style="color:var(--warn)">p=0.0597</span></div><div class="node__b"><i style="width:41%;background:var(--warn)"></i></div></div>
+      <div class="node"><div class="node__i">⑤ CALL</div><div class="node__n">RELIANCE</div><div class="node__v">HOLD <span style="color:var(--faint)">0.512</span></div><div class="node__b"><i style="width:51%;background:var(--flat)"></i></div></div>
+    </nav>
+    <div class="grid3">
+      <div class="cell"><div class="cell__k">Permutation p-value</div><div class="cell__v" style="color:var(--warn)">0.0597</div><div class="cell__s">200 shuffled-label runs · NOT significant</div></div>
+      <div class="cell"><div class="cell__k">ROC AUC</div><div class="cell__v">0.5470</div><div class="cell__s">baseline ElasticNet 0.5256 — beats it</div></div>
+      <div class="cell"><div class="cell__k">Features</div><div class="cell__v">94</div><div class="cell__s">incl. cross-sectional market ranks</div></div>
+    </div>
+    <div class="ev" style="border-bottom:0">
+      <div class="ev__h"><span class="ev__n">④ Model card</span><span class="ev__r"></span><span class="ev__m">/model/current</span></div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:30px">
+        <div>
+          <div class="pr"><span class="pr__k">Run id</span><span class="pr__v">20260801_231b</span></div>
+          <div class="pr"><span class="pr__k">Trained at</span><span class="pr__v">2026-08-01</span></div>
+          <div class="pr"><span class="pr__k">Model type</span><span class="pr__v">stacked</span></div>
+          <div class="pr"><span class="pr__k">Universe size</span><span class="pr__v">30</span></div>
+          <div class="pr"><span class="pr__k">Significant at 0.05</span><span class="pr__v" style="color:var(--down-lit)">no</span></div>
+        </div>
+        <div>
+          <p style="font-size:14px; line-height:1.6; color:var(--muted)">
+            Across 200 runs on <strong style="color:var(--text)">shuffled labels</strong>, about 12 did
+            as well as the real model. The edge is real enough to beat a linear baseline, and not
+            strong enough to rule out luck.
+          </p>
+          <p style="font-size:13px; margin-top:12px; color:var(--faint)">
+            This screen exists so the claim is checkable rather than asserted. It is the page a
+            reviewer would ask for, and right now there is nowhere to put it.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sect">
+  <div class="sect__n">05 — YOUR CALL</div>
+  <h2 class="sect__t">What to react to</h2>
+  <p class="sect__d">
+    The substantive question is the <strong>chain rail</strong> — does making the pipeline the primary
+    navigation feel right, or do you want the app to stay a single stock screen with the other
+    surfaces tucked behind a menu? After that: the <strong>verdict at 76px</strong> as the lead
+    (v1 had it in a sidebar), the new <strong>provenance rail</strong>, and whether
+    <strong>Archivo</strong> as a display face works for you. Palette is unchanged from v1 — it was
+    validated and I did not want to re-open it without a reason.
+  </p>
+</section>
+</div>
+
+<script>
+const CANDLES=[{"t": "2026-03-26", "o": 1420.0, "h": 1430.5, "l": 1408.4, "c": 1413.1, "v": 19041331.0}, {"t": "2026-03-27", "o": 1401.0, "h": 1404.7, "l": 1345.0, "c": 1348.1, "v": 23266517.0}, {"t": "2026-03-30", "o": 1335.0, "h": 1365.0, "l": 1334.1, "c": 1343.9, "v": 24393861.0}, {"t": "2026-03-31", "o": 1335.0, "h": 1365.0, "l": 1334.1, "c": 1343.9, "v": 24393861.0}, {"t": "2026-04-01", "o": 1384.2, "h": 1384.4, "l": 1362.9, "c": 1369.2, "v": 14404619.0}, {"t": "2026-04-02", "o": 1357.0, "h": 1358.2, "l": 1328.0, "c": 1350.5, "v": 21280051.0}, {"t": "2026-04-03", "o": 1357.0, "h": 1358.2, "l": 1328.0, "c": 1350.5, "v": 21280051.0}, {"t": "2026-04-06", "o": 1359.0, "h": 1359.0, "l": 1290.0, "c": 1304.7, "v": 29274881.0}, {"t": "2026-04-07", "o": 1295.0, "h": 1308.3, "l": 1291.0, "c": 1304.6, "v": 28388922.0}, {"t": "2026-04-08", "o": 1349.0, "h": 1350.6, "l": 1326.2, "c": 1347.8, "v": 21817543.0}, {"t": "2026-04-09", "o": 1346.0, "h": 1350.0, "l": 1326.3, "c": 1330.0, "v": 20725390.0}, {"t": "2026-04-10", "o": 1337.0, "h": 1352.3, "l": 1331.5, "c": 1350.2, "v": 19364461.0}, {"t": "2026-04-13", "o": 1321.2, "h": 1327.6, "l": 1310.0, "c": 1315.1, "v": 28753269.0}, {"t": "2026-04-14", "o": 1321.2, "h": 1327.6, "l": 1310.0, "c": 1315.1, "v": 28753269.0}, {"t": "2026-04-15", "o": 1337.0, "h": 1347.0, "l": 1334.2, "c": 1344.1, "v": 15313779.0}, {"t": "2026-04-16", "o": 1352.0, "h": 1353.8, "l": 1330.0, "c": 1343.3, "v": 30211012.0}, {"t": "2026-04-17", "o": 1340.0, "h": 1368.4, "l": 1340.0, "c": 1365.0, "v": 13869105.0}, {"t": "2026-04-20", "o": 1363.2, "h": 1373.0, "l": 1352.8, "c": 1363.3, "v": 13614733.0}, {"t": "2026-04-21", "o": 1359.0, "h": 1369.8, "l": 1350.1, "c": 1353.3, "v": 27293629.0}, {"t": "2026-04-22", "o": 1350.3, "h": 1366.0, "l": 1349.1, "c": 1362.1, "v": 9525953.0}, {"t": "2026-04-23", "o": 1346.0, "h": 1355.5, "l": 1340.7, "c": 1343.4, "v": 16385079.0}, {"t": "2026-04-24", "o": 1340.0, "h": 1345.9, "l": 1325.0, "c": 1327.8, "v": 11744802.0}, {"t": "2026-04-27", "o": 1313.0, "h": 1371.6, "l": 1311.0, "c": 1365.8, "v": 24673098.0}, {"t": "2026-04-28", "o": 1358.0, "h": 1395.2, "l": 1357.0, "c": 1388.9, "v": 41027699.0}, {"t": "2026-04-29", "o": 1392.0, "h": 1433.8, "l": 1391.3, "c": 1425.4, "v": 30542143.0}, {"t": "2026-04-30", "o": 1409.0, "h": 1437.0, "l": 1393.1, "c": 1430.8, "v": 30957881.0}, {"t": "2026-05-04", "o": 1433.4, "h": 1467.4, "l": 1433.4, "c": 1463.1, "v": 24035700.0}, {"t": "2026-05-05", "o": 1460.0, "h": 1473.4, "l": 1450.0, "c": 1463.6, "v": 23543341.0}, {"t": "2026-05-06", "o": 1463.0, "h": 1473.3, "l": 1427.5, "c": 1437.9, "v": 14221786.0}, {"t": "2026-05-07", "o": 1438.8, "h": 1449.5, "l": 1430.3, "c": 1436.2, "v": 19816903.0}, {"t": "2026-05-08", "o": 1426.0, "h": 1442.8, "l": 1417.5, "c": 1435.2, "v": 8663105.0}, {"t": "2026-05-11", "o": 1420.0, "h": 1428.0, "l": 1382.0, "c": 1388.2, "v": 15261787.0}, {"t": "2026-05-12", "o": 1392.0, "h": 1393.5, "l": 1360.3, "c": 1364.0, "v": 24357500.0}, {"t": "2026-05-13", "o": 1361.4, "h": 1372.4, "l": 1352.4, "c": 1358.8, "v": 13797989.0}, {"t": "2026-05-14", "o": 1365.2, "h": 1378.0, "l": 1358.4, "c": 1361.8, "v": 17303059.0}, {"t": "2026-05-15", "o": 1356.8, "h": 1364.8, "l": 1329.2, "c": 1336.4, "v": 19976192.0}, {"t": "2026-05-18", "o": 1334.0, "h": 1342.0, "l": 1318.7, "c": 1335.9, "v": 13022473.0}, {"t": "2026-05-19", "o": 1338.7, "h": 1344.0, "l": 1318.4, "c": 1322.7, "v": 21665501.0}, {"t": "2026-05-20", "o": 1318.7, "h": 1362.9, "l": 1312.6, "c": 1359.7, "v": 13248515.0}, {"t": "2026-05-21", "o": 1367.2, "h": 1370.9, "l": 1345.2, "c": 1349.6, "v": 17150630.0}, {"t": "2026-05-22", "o": 1350.0, "h": 1367.4, "l": 1349.1, "c": 1354.5, "v": 7105813.0}, {"t": "2026-05-25", "o": 1366.8, "h": 1371.1, "l": 1357.0, "c": 1367.0, "v": 6750071.0}, {"t": "2026-05-26", "o": 1360.1, "h": 1368.5, "l": 1352.4, "c": 1356.3, "v": 13769747.0}, {"t": "2026-05-27", "o": 1353.0, "h": 1361.0, "l": 1348.6, "c": 1350.5, "v": 13215138.0}, {"t": "2026-05-28", "o": 1353.0, "h": 1361.0, "l": 1348.6, "c": 1350.5, "v": 13215138.0}, {"t": "2026-05-29", "o": 1364.0, "h": 1369.0, "l": 1317.0, "c": 1321.2, "v": 42634247.0}, {"t": "2026-06-01", "o": 1332.5, "h": 1335.5, "l": 1318.5, "c": 1320.0, "v": 10700603.0}, {"t": "2026-06-02", "o": 1307.7, "h": 1327.8, "l": 1300.3, "c": 1314.6, "v": 23302785.0}, {"t": "2026-06-03", "o": 1315.0, "h": 1324.0, "l": 1301.0, "c": 1313.2, "v": 20012293.0}, {"t": "2026-06-04", "o": 1301.0, "h": 1311.2, "l": 1293.1, "c": 1303.7, "v": 23474327.0}, {"t": "2026-06-05", "o": 1304.5, "h": 1306.0, "l": 1288.0, "c": 1291.0, "v": 17785223.0}, {"t": "2026-06-08", "o": 1277.0, "h": 1282.6, "l": 1259.2, "c": 1263.3, "v": 16494759.0}, {"t": "2026-06-09", "o": 1269.0, "h": 1274.2, "l": 1257.5, "c": 1269.2, "v": 23620214.0}, {"t": "2026-06-10", "o": 1275.0, "h": 1300.5, "l": 1254.4, "c": 1258.8, "v": 21012796.0}, {"t": "2026-06-11", "o": 1258.0, "h": 1276.0, "l": 1253.2, "c": 1263.0, "v": 13117486.0}, {"t": "2026-06-12", "o": 1277.0, "h": 1297.0, "l": 1262.5, "c": 1293.0, "v": 11988785.0}, {"t": "2026-06-15", "o": 1315.3, "h": 1325.0, "l": 1303.3, "c": 1307.0, "v": 18633321.0}, {"t": "2026-06-16", "o": 1313.4, "h": 1333.4, "l": 1306.4, "c": 1328.8, "v": 18513223.0}, {"t": "2026-06-17", "o": 1333.0, "h": 1334.0, "l": 1317.0, "c": 1332.7, "v": 10029170.0}, {"t": "2026-06-18", "o": 1330.0, "h": 1333.9, "l": 1322.0, "c": 1328.1, "v": 15494549.0}, {"t": "2026-06-19", "o": 1328.0, "h": 1338.2, "l": 1305.3, "c": 1309.5, "v": 24887034.0}, {"t": "2026-06-22", "o": 1316.7, "h": 1344.9, "l": 1314.1, "c": 1326.5, "v": 12931213.0}, {"t": "2026-06-23", "o": 1328.9, "h": 1333.0, "l": 1304.0, "c": 1309.5, "v": 15400184.0}, {"t": "2026-06-24", "o": 1305.7, "h": 1322.0, "l": 1297.5, "c": 1313.6, "v": 11030917.0}, {"t": "2026-06-25", "o": 1318.0, "h": 1328.0, "l": 1314.6, "c": 1318.1, "v": 12694362.0}, {"t": "2026-06-26", "o": 1318.0, "h": 1328.0, "l": 1314.6, "c": 1318.1, "v": 12694362.0}, {"t": "2026-06-29", "o": 1308.0, "h": 1313.7, "l": 1292.6, "c": 1301.0, "v": 13757656.0}, {"t": "2026-06-30", "o": 1306.9, "h": 1306.9, "l": 1290.0, "c": 1293.9, "v": 15695263.0}, {"t": "2026-07-01", "o": 1298.9, "h": 1312.2, "l": 1296.5, "c": 1308.0, "v": 7001401.0}, {"t": "2026-07-02", "o": 1310.0, "h": 1313.2, "l": 1299.0, "c": 1303.5, "v": 17795024.0}, {"t": "2026-07-03", "o": 1312.0, "h": 1312.0, "l": 1302.0, "c": 1304.0, "v": 7839550.0}, {"t": "2026-07-06", "o": 1304.0, "h": 1325.6, "l": 1299.4, "c": 1321.3, "v": 7610709.0}, {"t": "2026-07-07", "o": 1323.5, "h": 1328.0, "l": 1304.1, "c": 1308.4, "v": 14335554.0}, {"t": "2026-07-08", "o": 1297.0, "h": 1302.3, "l": 1271.6, "c": 1275.9, "v": 19960868.0}, {"t": "2026-07-09", "o": 1277.1, "h": 1296.5, "l": 1274.2, "c": 1279.8, "v": 14651963.0}, {"t": "2026-07-10", "o": 1291.9, "h": 1311.1, "l": 1287.8, "c": 1307.8, "v": 8412537.0}, {"t": "2026-07-13", "o": 1300.0, "h": 1306.4, "l": 1295.0, "c": 1296.9, "v": 9488352.0}, {"t": "2026-07-14", "o": 1290.0, "h": 1308.0, "l": 1286.9, "c": 1293.0, "v": 13511284.0}, {"t": "2026-07-15", "o": 1294.1, "h": 1310.9, "l": 1294.1, "c": 1295.5, "v": 9577965.0}, {"t": "2026-07-16", "o": 1295.5, "h": 1309.4, "l": 1291.8, "c": 1296.6, "v": 15631046.0}, {"t": "2026-07-17", "o": 1300.0, "h": 1330.3, "l": 1296.1, "c": 1327.2, "v": 18302218.0}, {"t": "2026-07-20", "o": 1317.2, "h": 1345.9, "l": 1314.9, "c": 1323.1, "v": 14305844.0}, {"t": "2026-07-21", "o": 1321.0, "h": 1326.9, "l": 1302.7, "c": 1303.7, "v": 12753410.0}, {"t": "2026-07-22", "o": 1302.0, "h": 1304.6, "l": 1280.7, "c": 1288.6, "v": 10840383.0}, {"t": "2026-07-23", "o": 1283.0, "h": 1287.3, "l": 1268.0, "c": 1272.2, "v": 12580741.0}, {"t": "2026-07-24", "o": 1265.0, "h": 1283.4, "l": 1249.8, "c": 1278.0, "v": 9817000.0}, {"t": "2026-07-27", "o": 1288.2, "h": 1288.7, "l": 1278.0, "c": 1280.0, "v": 7163132.0}, {"t": "2026-07-28", "o": 1275.0, "h": 1279.2, "l": 1265.9, "c": 1267.7, "v": 9312184.0}, {"t": "2026-07-29", "o": 1275.0, "h": 1282.4, "l": 1268.7, "c": 1275.9, "v": 9448307.0}, {"t": "2026-07-30", "o": 1279.8, "h": 1297.0, "l": 1275.3, "c": 1292.9, "v": 12158451.0}];
+(function(){
+  const svg=document.getElementById('chart');
+  const W=1180,H=380,padL=8,padR=70,padT=12,padB=24, volH=56;
+  const priceH=H-padT-padB-volH-8;
+  let lo=Math.min(...CANDLES.map(d=>d.l)), hi=Math.max(...CANDLES.map(d=>d.h));
+  const pd=(hi-lo)*.06; lo-=pd; hi+=pd;
+  const maxV=Math.max(...CANDLES.map(d=>d.v)), n=CANDLES.length;
+  const iw=W-padL-padR, step=iw/n, bw=Math.max(2.5,step*.62);
+  const y=v=>padT+priceH-((v-lo)/(hi-lo))*priceH, x=i=>padL+step*i+step/2;
+  const ns='http://www.w3.org/2000/svg';
+  const el=(t,a)=>{const e=document.createElementNS(ns,t);for(const k in a)e.setAttribute(k,a[k]);return e};
+  for(let i=0;i<=4;i++){const v=lo+(hi-lo)*i/4, yy=y(v);
+    svg.appendChild(el('line',{x1:padL,x2:W-padR,y1:yy,y2:yy,stroke:'#24262A','stroke-width':1}));
+    const t=el('text',{x:W-padR+9,y:yy+3.5,fill:'#6A6A67','font-size':10,'font-family':'IBM Plex Mono, monospace'});
+    t.textContent=v.toFixed(0); svg.appendChild(t);}
+  let lm=null;
+  CANDLES.forEach((d,i)=>{const m=d.t.slice(0,7);
+    if(lm&&m!==lm){svg.appendChild(el('line',{x1:x(i)-step/2,x2:x(i)-step/2,y1:padT,y2:padT+priceH+volH+8,stroke:'#24262A'}));
+      const t=el('text',{x:x(i)-step/2+6,y:H-7,fill:'#6A6A67','font-size':10,'font-family':'IBM Plex Mono, monospace'});
+      t.textContent=new Date(d.t).toLocaleString('en',{month:'short'}); svg.appendChild(t);} lm=m;});
+  const vT=padT+priceH+8;
+  CANDLES.forEach((d,i)=>{const up=d.c>=d.o,h=Math.max(1,(d.v/maxV)*volH);
+    svg.appendChild(el('rect',{x:x(i)-bw/2,y:vT+volH-h,width:bw,height:h,fill:up?'#007928':'#d2736c','fill-opacity':.42,rx:1}));});
+  CANDLES.forEach((d,i)=>{const up=d.c>=d.o,c=up?'#12A03A':'#d2736c';
+    svg.appendChild(el('line',{x1:x(i),x2:x(i),y1:y(d.h),y2:y(d.l),stroke:c,'stroke-width':1.4,'stroke-opacity':.85}));
+    svg.appendChild(el('rect',{x:x(i)-bw/2,y:y(Math.max(d.o,d.c)),width:bw,height:Math.max(1.5,Math.abs(y(d.o)-y(d.c))),fill:c,rx:1}));});
+  const L=CANDLES[CANDLES.length-1],ly=y(L.c);
+  svg.appendChild(el('line',{x1:padL,x2:W-padR,y1:ly,y2:ly,stroke:'#d2736c','stroke-dasharray':'3 3','stroke-opacity':.7}));
+  svg.appendChild(el('rect',{x:W-padR+3,y:ly-9,width:62,height:18,fill:'#d2736c',rx:2}));
+  const t2=el('text',{x:W-padR+9,y:ly+4,fill:'#17181A','font-size':10.5,'font-weight':600,'font-family':'IBM Plex Mono, monospace'});
+  t2.textContent=L.c.toFixed(2); svg.appendChild(t2);
+})();
+const ROWS=[["TATASTEEL","BUY",.617,186.92,"bear"],["POWERGRID","BUY",.588,285.70,"ranging"],["WIPRO","BUY",.566,186.33,"bear"],["NTPC","BUY",.558,344.85,"bear"],["COALINDIA","BUY",.556,417.20,"bear"],["HDFCBANK","BUY",.555,753.95,"bear"],["JSWSTEEL","HOLD",.545,1270.80,"ranging"],["ITC","HOLD",.534,285.05,"ranging"],["RELIANCE","HOLD",.5118,1292.90,"ranging"]];
+document.getElementById('scb').innerHTML=ROWS.map(([s,g,p,px,r])=>{
+  const e=(p-.5)*200,u=e>=0,c=u?'var(--up)':'var(--down)';
+  return `<tr class="${s==='RELIANCE'?'is-cur':''}"><td><span class="sym">${s}</span></td>
+  <td><span class="num" style="color:${u?'var(--up-lit)':'var(--down-lit)'};font-size:11.5px">${u?'▲':'▼'} ${g}</span></td>
+  <td class="num">${p.toFixed(3)}</td>
+  <td><span class="track"><u></u><i style="${u?'left':'right'}:50%;width:${Math.min(50,Math.abs(e)*2)}%;background:${c}"></i></span>
+  <span class="num" style="margin-left:10px;font-size:12px">${u?'+':'−'}${Math.abs(e).toFixed(1)}%</span></td>
+  <td class="num">₹${px.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+  <td class="num" style="color:var(--muted);font-size:11.5px">${r}</td></tr>`}).join('');
+</script>
+<script>
+const q=new URLSearchParams(location.search).get('only');
+if(q!==null){
+  // capture BEFORE removing parents — the apps live inside .sect
+  const apps=[...document.querySelectorAll('.app')];
+  const keep=apps[Number(q)];
+  const doc=document.querySelector('.doc');
+  doc.querySelectorAll(':scope > header, :scope > .sect').forEach(e=>e.remove());
+  doc.style.padding='14px';
+  if(keep) doc.appendChild(keep);
+}
+</script>
+</body>
+</html>

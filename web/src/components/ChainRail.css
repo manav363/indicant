@@ -1,0 +1,85 @@
+.chain {
+  display: flex;
+  align-items: stretch;
+  background: linear-gradient(180deg, #212327, var(--bg-panel));
+  border-bottom: 1px solid var(--line);
+}
+
+.chain__brand {
+  display: flex; align-items: center; gap: var(--s2);
+  padding: 0 var(--s5);
+  border-right: 1px solid var(--line);
+  font-family: var(--display);
+  font-weight: 700; font-size: var(--t-base);
+  font-variation-settings: "wdth" 108;
+  letter-spacing: .01em; white-space: nowrap;
+}
+.chain__mark { width: 16px; height: 16px; display: block; }
+
+.chain__nodes {
+  display: flex; flex: 1; margin: 0; padding: 0; list-style: none; min-width: 0;
+}
+.chain__item { flex: 1; min-width: 0; display: flex; }
+
+.node {
+  position: relative;
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 10px var(--s4) 10px var(--s6);
+  background: none; border: 0; border-right: 1px solid var(--line-soft);
+  color: inherit; text-align: left; cursor: pointer;
+  transition: background var(--dur) var(--ease);
+  font: inherit;
+}
+.node:hover:not(.is-static) { background: rgba(255, 255, 255, .022); }
+.node.is-static { cursor: default; }
+
+.node.is-active {
+  background: var(--accent-dim);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+/* The chevron is what makes this read as a directed pipeline rather than as
+   five peer tabs. Rotated square, so it needs no extra asset. */
+.node::before {
+  content: "";
+  position: absolute; left: -7px; top: 50%;
+  width: 12px; height: 12px;
+  transform: translateY(-50%) rotate(45deg);
+  border-top: 1px solid var(--line-soft);
+  border-right: 1px solid var(--line-soft);
+  background: var(--bg);
+  z-index: 2;
+}
+.chain__item:first-child .node::before { display: none; }
+
+.node__i {
+  font-family: var(--mono); font-size: var(--t-2xs);
+  letter-spacing: .12em; color: var(--fg-faint); line-height: 1;
+}
+.node__n {
+  font-family: var(--mono); font-size: var(--t-xs);
+  letter-spacing: .14em; text-transform: uppercase;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.node__v {
+  font-family: var(--mono); font-size: var(--t-sm); line-height: 1.3;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.node__d { font-style: normal; color: var(--fg-faint); }
+
+.node__b {
+  display: block; height: 2px; margin-top: 5px;
+  border-radius: 1px; background: var(--line); overflow: hidden;
+}
+.node__b i {
+  display: block; height: 100%; border-radius: 1px;
+  transition: width var(--dur) var(--ease);
+}
+
+/* Below this the five nodes stop being readable side by side; the rail
+   scrolls horizontally rather than crushing every label to an ellipsis. */
+@media (max-width: 1080px) {
+  .chain { overflow-x: auto; }
+  .chain__nodes { min-width: 760px; }
+}

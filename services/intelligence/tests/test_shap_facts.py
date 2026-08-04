@@ -47,12 +47,23 @@ class TestDescribe:
             assert not label.startswith(prefix)
 
     def test_percentage_features_are_formatted_with_a_sign(self) -> None:
+        # ROC arrives ALREADY in percent — the formula in technical.py ends in
+        # "* 100" — so it is passed through at scale 1.0. These assertions used
+        # to expect a second ×100, which is exactly the bug that rendered a
+        # -11.9% move as "-1193.0%".
         _, display = describe("momentum_roc_6m")
-        assert display.format(0.182) == "+18.2%"
+        assert display.format(18.2) == "+18.2%"
 
     def test_negative_percentages_keep_their_sign(self) -> None:
         _, display = describe("momentum_roc_6m")
-        assert display.format(-0.075) == "-7.5%"
+        assert display.format(-7.5) == "-7.5%"
+
+    def test_ratio_features_are_scaled_to_percent_but_roc_is_not(self) -> None:
+        """The two families must not be confused: one is a ratio, one is already %."""
+        _, ratio = describe("trend_price_vs_sma200")   # a ratio, needs x100
+        _, already = describe("momentum_roc_6m")       # already percent
+        assert ratio.format(0.05) == "+5.0%"
+        assert already.format(0.05) == "+0.1%"
 
     def test_non_finite_values_say_unavailable(self) -> None:
         _, display = describe("momentum_roc_6m")

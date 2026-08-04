@@ -1,0 +1,126 @@
+/* Indicant design tokens.
+ *
+ * ── Palette ───────────────────────────────────────────────────────────────
+ * Family: "Graphite & Copper" — industrial, engineered, precise. Chosen from
+ * the subject rather than from habit: this reads the NSE's own end-of-day
+ * bhavcopy (a government record, not a live feed) and its whole claim is that
+ * it reports how often it is wrong. That is a measuring instrument, not a
+ * casino, so the ground is warm-neutral graphite rather than the near-black
+ * plus neon accent every trading UI ships.
+ *
+ * The family's own accent is copper #C06E4E. It was REJECTED by the validator:
+ * against the down-red it scores ΔE 5.1 normal-vision and 4.3 deutan, so a
+ * copper accent would have read as a loss on a losing stock. The accent below
+ * is the only candidate that stays clear of BOTH direction colours.
+ *
+ * ── Direction ─────────────────────────────────────────────────────────────
+ * VALIDATED against surface #17181A — do not hand-edit without re-running
+ * the dataviz validator:
+ *   up/down  CVD ΔE 9.7 (protan) · normal ΔE 28.5 · contrast PASS
+ *   accent   vs down ΔE 24.0 normal · all six checks PASS
+ * Colour is never the sole carrier — glyph, label and position carry it too.
+ * See lib/direction.ts and the `mono` palette below, which exists so the
+ * claim stays continuously falsifiable.
+ *
+ * ── Type ──────────────────────────────────────────────────────────────────
+ * THREE faces with distinct jobs. The previous build used one superfamily for
+ * every role, which is most of why it read flat — there was no display voice
+ * at all. Archivo carries display (it has a width axis, so headline numbers
+ * can be cut wide), Inter carries everything read, IBM Plex Mono carries data
+ * because every figure here came out of a fixed-width government CSV.
+ *
+ * Self-hosted via @fontsource, not Google Fonts: infra/nginx.conf ships
+ * `font-src 'self'` and its comment says the frontend bundles everything so
+ * the CSP can stay strict. A CDN would mean widening it.
+ */
+
+:root {
+  color-scheme: dark;
+
+  /* Ground — three close values so surfaces read as layered material. */
+  --bg: #17181A;
+  --bg-deep: #101113;
+  --bg-panel: #1E2023;
+  --bg-raised: #26282C;
+  --bg-input: #131416;
+
+  --line: #2E3135;
+  --line-soft: #24262A;
+  --line-bright: #3A3E44;
+
+  /* Bone white. Pure #fff on dark glares and reads cheap. */
+  --fg: #E8E6E3;
+  --fg-dim: #9B9A96;
+  --fg-faint: #6A6A67;
+
+  /* VALIDATED — see header. */
+  --dir-up: #007928;
+  --dir-down: #d2736c;
+  --dir-flat: #6A6A67;
+  --dir-up-lit: #12A03A;
+  --dir-down-lit: #E08A83;
+  --dir-up-wash: rgba(0, 121, 40, .14);
+  --dir-down-wash: rgba(210, 115, 108, .16);
+
+  --accent: #3E8FD9;
+  --accent-dim: rgba(62, 143, 217, .13);
+  --warn: #C8A15A;
+
+  --display: "Archivo Variable", "Archivo", system-ui, sans-serif;
+  --sans: "Inter Variable", "Inter", system-ui, -apple-system, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* Modular scale ~1.25. Display steps sit deliberately far from the label
+     steps — the old build set almost everything at 12-13px, so nothing led. */
+  --t-2xs: 9px;
+  --t-xs: 10.5px;
+  --t-sm: 12px;
+  --t-base: 13.5px;
+  --t-md: 15px;
+  --t-lg: 19px;
+  --t-xl: 24px;
+  --t-2xl: 34px;
+  --t-3xl: 48px;
+  --t-hero: clamp(44px, 5.4vw, 76px);
+
+  --s1: 4px;  --s2: 8px;  --s3: 12px; --s4: 16px;
+  --s5: 20px; --s6: 24px; --s8: 32px; --s10: 40px;
+
+  /* Elevation as a real scale: ambient + key + a 1px inset top highlight so a
+     card edge catches light like a bezel. */
+  --e1: 0 1px 2px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.03);
+  --e2: 0 2px 6px rgba(0,0,0,.45), 0 8px 24px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.04);
+  --e3: 0 4px 12px rgba(0,0,0,.5), 0 18px 48px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.055);
+  --well: inset 0 1px 4px rgba(0,0,0,.55);
+
+  --dur: 140ms;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Colour-vision-safe alternate, validated on this surface. */
+:root[data-palette="cvd"] {
+  --dir-up: #0095dd;
+  --dir-down: #c66c00;
+  --dir-up-lit: #33abe8;
+  --dir-down-lit: #e08a33;
+  --dir-up-wash: rgba(0, 149, 221, .14);
+  --dir-down-wash: rgba(198, 108, 0, .16);
+}
+
+/* Monochrome — the acceptance test, shipped as a setting so "every chart reads
+   with no colour" stays falsifiable rather than asserted. */
+:root[data-palette="mono"] {
+  --dir-up: var(--fg);
+  --dir-down: #8A8986;
+  --dir-flat: var(--fg-faint);
+  --dir-up-lit: var(--fg);
+  --dir-down-lit: #8A8986;
+  --dir-up-wash: rgba(255,255,255,.10);
+  --dir-down-wash: rgba(255,255,255,.04);
+  --accent: #C9C7C3;
+  --accent-dim: rgba(255,255,255,.07);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur: 0.01ms; }
+}

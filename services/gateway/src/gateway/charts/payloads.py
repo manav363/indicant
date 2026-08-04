@@ -20,8 +20,6 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Any
 
-import pandas as pd
-
 
 class BarDirection(StrEnum):
     UP = "up"
@@ -62,6 +60,19 @@ def direction_of(value: float, *, threshold: float = FLAT_THRESHOLD) -> BarDirec
     return BarDirection.FLAT
 
 
+def _time_of(bar: dict[str, Any]) -> str:
+    """Accept either name for the date field.
+
+    market-data calls it `time` (the charting convention); the lake calls it
+    `date`. Reading both here is one line and removes a rename step at the
+    call site that silently KeyError'd when the upstream name changed.
+    """
+    value = bar.get("time", bar.get("date"))
+    if value is None:
+        raise KeyError("bar has neither 'time' nor 'date'")
+    return str(value)
+
+
 def _encode(value: float, *, threshold: float = FLAT_THRESHOLD) -> dict[str, Any]:
     """The four-way encoding, applied once so no caller can forget part of it."""
     d = direction_of(value, threshold=threshold)
@@ -73,45 +84,43 @@ def _encode(value: float, *, threshold: float = FLAT_THRESHOLD) -> dict[str, Any
     }
 
 
-def candlestick_payload(prices: pd.DataFrame) -> list[dict[str, Any]]:
+def candlestick_payload(bars: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """OHLC bars with per-bar direction.
+
+    Takes the rows market-data returns, as they are. This used to take a
+    DataFrame, which meant the gateway — the one internet-facing service —
+    carried pandas solely to turn a list of dicts into a list of dicts, and it
+    was never declared as a dependency, so it worked in a shared dev venv and
+    ImportError'd in the container.
 
     Direction is close-vs-OPEN, not close-vs-previous-close: a candle body is
     green when the session closed above where it opened, which is what the shape
-    depicts. Using previous close would colour bodies inconsistently with their
+    depicts. Using previous close would colour bodies inconsistently with its
     own geometry.
     """
-    if prices.empty:
-        return []
-
-    out: list[dict[str, Any]] = []
-    for _, row in prices.iterrows():
-        change = float(row["close"]) - float(row["open"])
-        out.append(
-            {
-                "time": str(row["date"]),
-                "open": float(row["open"]),
-                "high": float(row["high"]),
-                "low": float(row["low"]),
-                "close": float(row["close"]),
-                **_encode(change),
-            }
-        )
-    return out
-
-
-def volume_payload(prices: pd.DataFrame) -> list[dict[str, Any]]:
-    """Volume bars coloured by the session's own direction, matching the
-    candles above them."""
-    if prices.empty:
-        return []
     return [
         {
-            "time": str(row["date"]),
-            "value": float(row["volume"]),
-            **_encode(float(row["close"]) - float(row["open"])),
+            "time": _time_of(bar),
+            "open": float(bar["open"]),
+            "high": float(bar["high"]),
+            "low": float(bar["low"]),
+            "close": float(bar["close"]),
+            **_encode(float(bar["close"]) - float(bar["open"])),
         }
-        for _, row in prices.iterrows()
+        for bar in bars
+    ]
+
+
+def volume_payload(bars: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Volume bars coloured by the session's own direction, matching the
+    candles above them."""
+    return [
+        {
+            "time": _time_of(bar),
+            "value": float(bar["volume"]),
+            **_encode(float(bar["close"]) - float(bar["open"])),
+        }
+        for bar in bars
     ]
 
 

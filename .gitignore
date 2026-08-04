@@ -14,8 +14,6 @@ venv/
 env/
 
 # Data & cache (never commit raw data)
-backend/data/
-backend/experiments/mlruns/
 data/
 *.parquet
 *.csv
@@ -37,9 +35,6 @@ data/
 mlruns/
 
 # Node
-frontend/node_modules/
-frontend/dist/
-frontend/.vite/
 *.log
 npm-debug.log*
 
@@ -56,7 +51,8 @@ Thumbs.db
 # Docker
 .dockerignore
 
-# SQLite WAL temp files (not the main db — model_registry.db IS committed)
+# SQLite WAL/SHM sidecars. The v1 model_registry.db is no longer in the tree;
+# its 5 permutation runs are preserved in history at 487b409.
 *.db-wal
 *.db-shm
 
@@ -73,3 +69,13 @@ htmlcov/
 
 # v2 venv
 .venv-v2/
+
+# Local data lake and trained artifacts — regenerable, and large
+data/lake/
+data/corp_actions.csv
+
+# Node. Global on purpose: this was once scoped to a single directory, and when
+# that directory was deleted the rule silently stopped matching — a routine
+# `git add -A` then staged 7,000 dependency files.
+node_modules/
+*.tsbuildinfo

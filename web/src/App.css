@@ -1,0 +1,79 @@
+/* Application shell.
+ *
+ * Atmosphere is one soft cool light from the top-left plus a vignette and a
+ * fine grain. That is what separates layered material from "flat #111 with
+ * boxes on it" — the grain also kills the banding the gradients would
+ * otherwise show on a dark surface.
+ */
+
+.app {
+  position: relative;
+  min-height: 100dvh;
+  display: grid; grid-template-rows: auto auto 1fr auto;
+  background: var(--bg); color: var(--fg);
+  font-family: var(--sans); font-size: var(--t-base);
+}
+
+.app::before {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background:
+    radial-gradient(1100px 520px at 10% -8%, rgba(62,143,217,.05), transparent 62%),
+    radial-gradient(800px 460px at 100% 108%, rgba(0,0,0,.42), transparent 60%);
+}
+.app::after {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: .15;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.42'/%3E%3C/svg%3E");
+}
+.app > * { position: relative; z-index: 1; }
+
+.skip {
+  position: absolute; left: -9999px; top: 0; z-index: 20;
+  background: var(--bg-raised); color: var(--fg);
+  padding: var(--s2) var(--s4); border: 1px solid var(--accent);
+}
+.skip:focus { left: var(--s3); top: var(--s3); }
+
+/* ---- toolbar ---------------------------------------------------------- */
+.toolbar {
+  display: flex; align-items: center; gap: var(--s4);
+  padding: var(--s3) var(--s5);
+  border-bottom: 1px solid var(--line);
+}
+.toolbar__right { margin-left: auto; }
+.toolbar__select {
+  background: var(--bg-input); color: var(--fg-dim);
+  border: 1px solid var(--line); border-radius: 4px;
+  font-family: var(--mono); font-size: var(--t-xs);
+  padding: 6px var(--s2);
+}
+
+.horizons {
+  display: flex; gap: 2px; padding: 3px;
+  background: var(--bg-input); border: 1px solid var(--line); border-radius: 5px;
+}
+.horizons__btn {
+  font-family: var(--mono); font-size: var(--t-sm); color: var(--fg-dim);
+  background: none; border: 0; padding: 6px var(--s3);
+  border-radius: 3px; cursor: pointer;
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.horizons__btn:hover { color: var(--fg); background: var(--bg-raised); }
+.horizons__btn[aria-current] {
+  background: linear-gradient(180deg, #33373D, #2A2D32);
+  color: var(--fg); box-shadow: var(--e1); font-weight: 500;
+}
+
+/* ---- footer ----------------------------------------------------------- */
+.footer {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: var(--s4); padding: var(--s3) var(--s5);
+  border-top: 1px solid var(--line); background: var(--bg-deep);
+  font-size: var(--t-sm); color: var(--fg-faint);
+}
+.footer__enc { font-family: var(--mono); font-size: var(--t-2xs); }
+
+@media (max-width: 720px) {
+  .toolbar { flex-wrap: wrap; }
+  .footer { flex-direction: column; align-items: flex-start; gap: var(--s2); }
+  .footer__enc { display: none; }
+}

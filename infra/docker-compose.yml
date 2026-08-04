@@ -1,12 +1,20 @@
-# Indicant v2 — four services, one shared lake volume.
+# Indicant v2 — five services over one shared lake.
 #
-# The lake is a named volume mounted read-write into market-data (the single
-# writer) and READ-ONLY into intelligence. That is the data-plane boundary
-# expressed in infrastructure rather than in a code review comment: intelligence
-# cannot write to the lake even if someone adds a write call.
+# The lake is mounted read-write into market-data (the single writer) and
+# READ-ONLY into intelligence. That is the data-plane boundary expressed in
+# infrastructure rather than in a code review comment: intelligence cannot write
+# to the lake even if someone adds a write call.
 #
-# Only the gateway is published to the host. market-data and intelligence are
-# reachable only on the internal network.
+# The lake is a BIND MOUNT of ../data/lake, not a named volume. A named volume
+# starts empty, and an empty lake means `docker compose up` yields a terminal
+# that renders "no lake / untrained" — technically running, useless as a demo,
+# and a ~20-year backfill away from being useful. Binding the host directory
+# means the stack comes up on the real 3.1M-row lake and the trained model
+# that are already on disk. Override with INDICANT_LAKE_DIR to point elsewhere.
+#
+# Only `web` (nginx) is published. It serves the terminal and proxies /api to
+# the gateway; market-data and intelligence are reachable only on the internal
+# network.
 
 name: indicant
 
@@ -22,7 +30,7 @@ services:
       # Polite by default. This is a free public archive.
       INDICANT_RATE_LIMIT: "0.35"
     volumes:
-      - lake:/data
+      - ${INDICANT_LAKE_DIR:-../data/lake}:/data
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 15s
@@ -39,7 +47,7 @@ services:
       INDICANT_LAKE_ROOT: /data
     volumes:
       # Read-only. The boundary is enforced by the mount, not by convention.
-      - lake:/data:ro
+      - ${INDICANT_LAKE_DIR:-../data/lake}:/data:ro
     depends_on:
       market-data:
         condition: service_healthy
@@ -59,9 +67,10 @@ services:
       INDICANT_MARKET_DATA_URL: http://market-data:8000
       INDICANT_INTELLIGENCE_URL: http://intelligence:8000
       INDICANT_CORS_ORIGINS: http://localhost:5173,http://localhost
-    ports:
-      # The only service published to the host.
-      - "8000:8000"
+    # Not published. nginx (`web`) is the only ingress; publishing the
+    # gateway too would put a second, unhardened door on the same house.
+    expose:
+      - "8000"
     depends_on:
       market-data:
         condition: service_healthy
@@ -85,7 +94,7 @@ services:
       # hammer the NSE archive from someone's laptop.
       INDICANT_WORKER_ENABLED: "false"
     volumes:
-      - lake:/data
+      - ${INDICANT_LAKE_DIR:-../data/lake}:/data
     depends_on:
       market-data:
         condition: service_healthy
@@ -97,5 +106,13 @@ services:
       start_period: 20s
     restart: unless-stopped
 
-volumes:
-  lake:
+  web:
+    build:
+      context: ..
+      dockerfile: web/Dockerfile
+    ports:
+      - "${INDICANT_WEB_PORT:-8080}:80"
+    depends_on:
+      gateway:
+        condition: service_healthy
+    restart: unless-stopped
