@@ -52,7 +52,12 @@ class Settings:
     @classmethod
     def from_env(cls) -> Settings:
         return cls(
-            lake_root=_env_path("INDICANT_LAKE_ROOT", "./data"),
+            # ./data/lake, matching intelligence's CLI default. These disagreed:
+            # market-data wrote to ./data/ while intelligence read ./data/lake/,
+            # so anyone running the CLIs locally without INDICANT_LAKE_ROOT set
+            # would ingest a lake the trainer could not see. Docker is unaffected
+            # — compose sets the variable explicitly for every service.
+            lake_root=_env_path("INDICANT_LAKE_ROOT", "./data/lake"),
             request_timeout=float(os.environ.get("INDICANT_HTTP_TIMEOUT", "30")),
             max_retries=int(os.environ.get("INDICANT_MAX_RETRIES", "3")),
             retry_backoff=float(os.environ.get("INDICANT_RETRY_BACKOFF", "2.0")),
