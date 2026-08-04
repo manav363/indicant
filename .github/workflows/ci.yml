@@ -36,7 +36,13 @@ jobs:
           done
 
       - name: Lint
-        run: ruff check packages services
+        # `--output-format=github` emits inline annotations. Without them a
+        # lint failure is only readable by someone who can open the raw job
+        # log, which makes a red build hard to act on — and impossible to
+        # diagnose from the API.
+        run: |
+          echo "ruff $(ruff --version)"
+          ruff check packages services --output-format=github
 
       - name: Test
         run: pytest packages services --no-cov -q
