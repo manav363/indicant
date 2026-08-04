@@ -8,6 +8,8 @@ whole project is measuring anything real.
 
 from __future__ import annotations
 
+from datetime import date
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -554,3 +556,60 @@ def test_serving_regime_feature_names_exist_in_a_real_panel():
         assert name in built.columns, (
             f"serving reads {name!r}, which the panel builder does not emit"
         )
+
+
+class TestServingRefusalPaths:
+    """The refusal branches in PredictionService.predict.
+
+    These matter because the API layer catches specific exception types and
+    turns them into a 422 with a user-facing message. An exception of the wrong
+    type does not just change a log line — it escapes that handler and reaches
+    the user as a 500 with no explanation.
+    """
+
+    def _service(self, panel: pd.DataFrame, universe: list[str]):
+        from unittest.mock import MagicMock
+
+        from intelligence.serving import PredictionService, ServedModel
+
+        model = ServedModel(
+            run_id="t", model=MagicMock(), feature_names=["f1"],
+            trained_at="2026-01-01", p_value=None, universe=universe,
+        )
+        svc = PredictionService(MagicMock(), model)
+        svc._panel = lambda symbols, as_of: panel
+        svc._client.trading_days = lambda: [date(2026, 7, 30)]
+        return svc
+
+    def test_symbol_dropped_from_the_panel_raises_KeyError_not_NameError(self) -> None:
+        """Regression: this branch referenced a `start` local that had moved
+        into _panel() during the caching refactor, so it raised NameError.
+        api/main.py catches KeyError and not NameError, so a legitimate "not
+        enough history" refusal surfaced as an unexplained 500.
+        """
+        panel = pd.DataFrame({
+            "symbol": ["AAA"], "date": [pd.Timestamp("2026-07-30")],
+            "f1": [1.0], "close": [10.0],
+        })
+        svc = self._service(panel, ["AAA", "BBB"])
+
+        with pytest.raises(KeyError, match="dropped during feature construction"):
+            svc.predict("BBB")
+
+    def test_the_refusal_names_the_window_it_looked_in(self) -> None:
+        """The message is the whole point of the branch — it tells the operator
+        which date range came back empty."""
+        panel = pd.DataFrame({
+            "symbol": ["AAA"], "date": [pd.Timestamp("2026-07-30")],
+            "f1": [1.0], "close": [10.0],
+        })
+        svc = self._service(panel, ["AAA", "BBB"])
+
+        with pytest.raises(KeyError) as exc:
+            svc.predict("BBB")
+        assert "2026-07-30" in str(exc.value)   # the as_of end of the window
+
+    def test_empty_panel_also_refuses_cleanly(self) -> None:
+        svc = self._service(pd.DataFrame(columns=["symbol", "date"]), ["AAA"])
+        with pytest.raises(KeyError, match="not enough history"):
+            svc.predict("AAA")

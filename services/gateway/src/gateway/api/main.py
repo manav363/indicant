@@ -21,13 +21,14 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from indicant_contracts import Prediction
 
+from gateway.api.terminal import router as terminal_router
+from gateway.api.terminal import warm_universe_cache
 from gateway.charts.payloads import verdict_bar_payload
 from gateway.composition.client import (
     UpstreamClient,
     first_failure,
     gather_upstreams,
 )
-from gateway.api.terminal import router as terminal_router, warm_universe_cache
 from gateway.narrative.templates import render
 
 MARKET_DATA_URL = os.environ.get("INDICANT_MARKET_DATA_URL", "http://market-data:8000")
@@ -47,10 +48,18 @@ app = FastAPI(
 app.include_router(terminal_router)
 
 
+# asyncio only holds a WEAK reference to a running task. Without a strong one
+# the warm-up could be garbage-collected mid-flight, and the symptom would be
+# the thing it exists to prevent — a 15s first request — appearing at random.
+_background: set[asyncio.Task[None]] = set()
+
+
 @app.on_event("startup")
 async def _warm() -> None:
     """Fire and forget — startup must not block on an upstream."""
-    asyncio.create_task(warm_universe_cache())
+    task = asyncio.create_task(warm_universe_cache())
+    _background.add(task)
+    task.add_done_callback(_background.discard)
 
 app.add_middleware(
     CORSMiddleware,

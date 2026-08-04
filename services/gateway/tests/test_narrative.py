@@ -311,12 +311,16 @@ def ohlc(n: int = 3, *, key: str = "time") -> list[dict[str, object]]:
     rows = [
         (date(2026, 7, 27 + i), o, h, low, c, v)
         for i, (o, h, low, c, v) in enumerate(
+            # strict=True: these five lists must stay the same length. Silent
+            # truncation would shorten the fixture and weaken every assertion
+            # built on it without failing anything.
             zip(
                 [100.0, 105.0, 103.0][:n],
                 [106.0, 107.0, 104.0][:n],
                 [99.0, 102.0, 100.0][:n],
                 [105.0, 103.0, 103.0][:n],
                 [1_000_000, 2_000_000, 1_500_000][:n],
+                strict=True,
             )
         )
     ]

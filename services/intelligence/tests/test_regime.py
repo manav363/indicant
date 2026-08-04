@@ -721,3 +721,43 @@ class TestMarketAggregatorCache:
             composite_signal="risk_on",
         )
         assert result.cache_ttl_minutes == 15
+
+
+class TestRegimeSubsystemReachability:
+    """Pin which regime implementation the API actually uses.
+
+    This project's recurring failure is code that is written, tested, and never
+    reached from production — `adjust_all` was one, the missing `--registry`
+    CLI flag was another, and 208 green tests hid both. This class does not
+    test regime maths; it tests the WIRING, which is the part a unit test
+    normally cannot see.
+    """
+
+    def test_the_served_regime_comes_from_serving_not_from_this_module(self) -> None:
+        """If someone wires RegimeClassifier into the API, this test should be
+        updated deliberately — not discovered months later from a support
+        ticket about two different regimes for the same stock."""
+        import inspect
+
+        from intelligence.api import main as api_main
+
+        source = inspect.getsource(api_main)
+        assert "RegimeClassifier" not in source, (
+            "RegimeClassifier now appears in the API. That may be correct, but "
+            "the module docstring in intelligence/regime/__init__.py states it "
+            "is unreachable — update it in the same change."
+        )
+        assert "_service().predict" in source or "svc.predict" in source
+
+    def test_serving_owns_the_regime_rule_that_ships(self) -> None:
+        """The two-condition rule is the one users see, so its inputs are
+        load-bearing and must exist in the panel the builder emits."""
+        from intelligence.serving import (
+            ADX_TRENDING_THRESHOLD,
+            REGIME_ADX_FEATURE,
+            TREND_FEATURE,
+        )
+
+        assert REGIME_ADX_FEATURE == "regime_adx"
+        assert TREND_FEATURE == "trend_price_vs_sma200"
+        assert 0 < ADX_TRENDING_THRESHOLD < 100

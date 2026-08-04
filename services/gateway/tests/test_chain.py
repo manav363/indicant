@@ -18,7 +18,6 @@ import pytest
 from fastapi.testclient import TestClient
 
 from gateway.api.main import app
-from gateway.api import terminal
 
 
 @pytest.fixture

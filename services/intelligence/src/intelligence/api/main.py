@@ -28,7 +28,6 @@ from intelligence.data.lake_client import (
     LakeNotAdjusted,
     UniverseNotComputed,
 )
-from intelligence.regime.classifier import RegimeClassifier
 from intelligence.serving import ModelNotTrained, PredictionService, load_model
 
 logger = logging.getLogger(__name__)

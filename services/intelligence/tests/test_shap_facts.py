@@ -49,7 +49,7 @@ class TestDescribe:
     def test_percentage_features_are_formatted_with_a_sign(self) -> None:
         # ROC arrives ALREADY in percent — the formula in technical.py ends in
         # "* 100" — so it is passed through at scale 1.0. These assertions used
-        # to expect a second ×100, which is exactly the bug that rendered a
+        # to expect a second x100, which is exactly the bug that rendered a
         # -11.9% move as "-1193.0%".
         _, display = describe("momentum_roc_6m")
         assert display.format(18.2) == "+18.2%"

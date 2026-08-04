@@ -598,5 +598,5 @@ async def warm_universe_cache() -> None:
     try:
         async with httpx.AsyncClient() as client:
             await _eligible_universe(client)
-    except Exception as exc:  # noqa: BLE001 - see docstring
+    except Exception as exc:
         logger.warning("universe cache warm-up skipped: %s", exc)
