@@ -6,7 +6,11 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    # Feature branches included deliberately. With only [main, develop] a push
+    # to feat/* ran nothing, so breakage stayed invisible until a PR was opened
+    # — and once that PR was closed, nothing ran at all. CI you have to open a
+    # PR to see is CI you find out about too late.
+    branches: [main, develop, 'feat/**', 'fix/**']
   pull_request:
     branches: [main]
 
