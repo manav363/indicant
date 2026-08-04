@@ -14,7 +14,15 @@ venv/
 env/
 
 # Data & cache (never commit raw data)
-data/
+#
+# ANCHORED with a leading slash. Unanchored, `data/` matches a directory of
+# that name at ANY depth — and it silently excluded
+# services/intelligence/src/intelligence/data/, which holds lake_client.py,
+# preprocessor.py and its __init__. Those are imported by serving.py, train.py,
+# cli.py, panel/builder.py and api/main.py, so the published repository could
+# not run the intelligence service at all. git status stayed clean the whole
+# time, because ignored files are not untracked files.
+/data/
 *.parquet
 *.csv
 *.h5

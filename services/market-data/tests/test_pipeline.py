@@ -12,7 +12,6 @@ from datetime import date
 
 import pandas as pd
 import pytest
-from conftest import canonical_frame, canonical_row
 from indicant_contracts import (
     CANONICAL_PRICE_COLUMNS,
     CorporateAction,
@@ -22,6 +21,7 @@ from indicant_contracts import (
     Verdict,
 )
 
+from conftest import canonical_frame, canonical_row
 from market_data._dates import as_date
 from market_data.adjust.factors import (
     AdjustmentError,

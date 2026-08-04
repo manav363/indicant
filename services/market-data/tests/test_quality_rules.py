@@ -11,6 +11,8 @@ from datetime import date
 
 import pandas as pd
 import pytest
+from indicant_contracts import CorporateAction, CorporateActionType, Severity, Tier
+
 from conftest import (
     TRADE_DATE,
     canonical_frame,
@@ -18,8 +20,6 @@ from conftest import (
     history_frame,
     prior_close_frame,
 )
-from indicant_contracts import CorporateAction, CorporateActionType, Severity, Tier
-
 from market_data.quality import rules as R
 from market_data.quality.rules import RuleContext
 

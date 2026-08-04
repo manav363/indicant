@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -63,8 +64,18 @@ class BaseModel(ABC):
         X: np.ndarray,
         y: np.ndarray,
         feature_names: list[str] | None = None,
+        registry: Any | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> BaseModel:
-        """Train the model on features X and labels y."""
+        """Train the model on features X and labels y.
+
+        `registry` and `metadata` are part of the interface because
+        `backtest.engine.run_backtest` passes them on every fold. They were
+        omitted here while both concrete models accepted them, so the ABC
+        described an interface no caller actually used — and a new subclass
+        written against this signature would have raised TypeError the first
+        time it reached a backtest, not at definition time.
+        """
         ...
 
     @abstractmethod

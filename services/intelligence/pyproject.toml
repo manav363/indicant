@@ -40,6 +40,12 @@ packages = ["src/intelligence"]
 
 [tool.ruff]
 line-length = 100
+# `src` is declared explicitly so first-party classification does not depend on
+# what happens to be installed in the environment. Without it, ruff called
+# `intelligence` first-party in a working tree with the packages pip-installed
+# and third-party in a fresh CI checkout — so import-sort results differed
+# between a developer machine and CI, and lint failed only on the server.
+src = ["src", "tests"]
 target-version = "py311"
 
 [tool.ruff.lint]
@@ -53,6 +59,11 @@ select = ["E", "F", "I", "N", "UP", "B", "SIM", "RUF"]
 # ModelNotTrained is a refusal, not a fault — the model has not been built
 # yet. Naming it ...Error would frame a correct state as a malfunction.
 "src/intelligence/serving.py" = ["N803", "N806", "N818"]
+# Same distinction: UniverseNotComputed and LakeNotAdjusted mean a pipeline
+# step has not run yet, which is a state to report rather than a malfunction.
+# Genuine faults elsewhere DO carry the suffix (e.g. ...Error in the quality
+# and ingest layers); these two deliberately do not.
+"src/intelligence/data/lake_client.py" = ["N818"]
 "src/intelligence/explain/*.py" = ["N803", "N806"]
 "src/intelligence/validation/walk_forward.py" = ["E501", "N803", "N806", "RUF001", "RUF002", "SIM", "UP"]
 "src/intelligence/validation/*.py" = ["N803", "N806"]
@@ -65,8 +76,6 @@ select = ["E", "F", "I", "N", "UP", "B", "SIM", "RUF"]
 "src/intelligence/models/signals.py" = ["E501", "RUF001", "RUF002", "SIM", "UP"]
 "src/intelligence/models/sizing.py" = ["E501", "RUF001", "RUF002", "SIM", "UP"]
 "src/intelligence/models/base.py" = ["E501", "RUF001", "RUF002", "SIM", "UP", "B"]
-"src/intelligence/regime/classifier.py" = ["E501", "RUF001", "RUF002", "RUF012", "SIM", "UP", "B"]
-"src/intelligence/regime/market.py" = ["E501", "RUF001", "RUF002", "SIM", "UP"]
 "src/intelligence/backtest/*.py" = ["E501", "N803", "N806", "RUF001", "RUF002", "SIM", "UP", "B"]
 "src/intelligence/registry/*.py" = ["E501", "RUF001", "RUF002", "RUF005", "SIM", "UP"]
 "src/intelligence/data/preprocessor.py" = ["E501", "RUF001", "RUF002", "SIM", "UP"]

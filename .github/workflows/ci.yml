@@ -6,7 +6,11 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    # Feature branches included deliberately. With only [main, develop] a push
+    # to feat/* ran nothing, so breakage stayed invisible until a PR was opened
+    # — and once that PR was closed, nothing ran at all. CI you have to open a
+    # PR to see is CI you find out about too late.
+    branches: [main, develop, 'feat/**', 'fix/**']
   pull_request:
     branches: [main]
 
@@ -32,7 +36,13 @@ jobs:
           done
 
       - name: Lint
-        run: ruff check packages services
+        # `--output-format=github` emits inline annotations. Without them a
+        # lint failure is only readable by someone who can open the raw job
+        # log, which makes a red build hard to act on — and impossible to
+        # diagnose from the API.
+        run: |
+          echo "ruff $(ruff --version)"
+          ruff check packages services --output-format=github
 
       - name: Test
         run: pytest packages services --no-cov -q
@@ -73,3 +83,44 @@ jobs:
       # Builds only. Running the stack needs a lake, which is gitignored.
       - name: Build all images
         run: docker compose -f infra/docker-compose.yml build
+
+      # Regression guard for a real defect: nginx `add_header` does not merge,
+      # so a location declaring any header of its own silently drops every
+      # inherited one. Two locations here set Cache-Control, and try_files
+      # internally re-routes into one of them — the result was ZERO security
+      # headers on every response, including the HTML document, which is
+      # exactly where a CSP does its work. No unit test can see this; it only
+      # exists once nginx is actually serving. Verified locally to fail when
+      # the include is removed and pass when it is present.
+      - name: Security headers are present on every response
+        run: |
+          set -u
+          docker build -f web/Dockerfile -t indicant-web-headers .
+          docker network create hdrnet
+
+          # nginx resolves `upstream gateway:8000` at STARTUP and refuses to
+          # boot if the name is missing, so the web image cannot run alone.
+          # A stub under that hostname is enough to let it serve static files.
+          docker run -d --name hdr-gw --network hdrnet --network-alias gateway \
+            python:3.13-alpine sh -c 'python -m http.server 8000'
+          docker run -d --name hdr --network hdrnet -p 8097:80 indicant-web-headers
+
+          for i in $(seq 1 30); do
+            curl -sf -o /dev/null http://127.0.0.1:8097/ && break || sleep 1
+          done
+
+          fail=0
+          for path in / /index.html /some-spa-route; do
+            for header in content-security-policy x-frame-options \
+                          x-content-type-options referrer-policy; do
+              if ! curl -s -D - -o /dev/null "http://127.0.0.1:8097$path" \
+                   | grep -qi "^$header:"; then
+                echo "MISSING $header on $path"
+                fail=1
+              fi
+            done
+          done
+
+          docker rm -f hdr hdr-gw >/dev/null 2>&1 || true
+          docker network rm hdrnet >/dev/null 2>&1 || true
+          exit $fail

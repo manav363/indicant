@@ -205,6 +205,13 @@ class PredictionService:
 
         own = frame[frame["symbol"] == sym]
         if own.empty:
+            # The window is named from the constant rather than a local: the
+            # `start` local moved into _panel() during the caching refactor, and
+            # this f-string kept referencing it — so this branch raised
+            # NameError instead of KeyError. The API layer catches KeyError and
+            # not NameError, so the refusal escaped as a 500 rather than a 422
+            # carrying this diagnostic.
+            start = as_of - timedelta(days=SERVING_LOOKBACK_DAYS)
             raise KeyError(
                 f"{sym}: dropped during feature construction "
                 f"(usually too little history in {start}..{as_of})"
