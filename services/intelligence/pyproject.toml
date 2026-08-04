@@ -59,6 +59,11 @@ select = ["E", "F", "I", "N", "UP", "B", "SIM", "RUF"]
 # ModelNotTrained is a refusal, not a fault — the model has not been built
 # yet. Naming it ...Error would frame a correct state as a malfunction.
 "src/intelligence/serving.py" = ["N803", "N806", "N818"]
+# Same distinction: UniverseNotComputed and LakeNotAdjusted mean a pipeline
+# step has not run yet, which is a state to report rather than a malfunction.
+# Genuine faults in this codebase DO carry the suffix — see LakeEmptyError and
+# InsufficientHistoryError in regime/source.py.
+"src/intelligence/data/lake_client.py" = ["N818"]
 "src/intelligence/explain/*.py" = ["N803", "N806"]
 "src/intelligence/validation/walk_forward.py" = ["E501", "N803", "N806", "RUF001", "RUF002", "SIM", "UP"]
 "src/intelligence/validation/*.py" = ["N803", "N806"]
