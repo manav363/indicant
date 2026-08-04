@@ -40,6 +40,12 @@ packages = ["src/intelligence"]
 
 [tool.ruff]
 line-length = 100
+# `src` is declared explicitly so first-party classification does not depend on
+# what happens to be installed in the environment. Without it, ruff called
+# `intelligence` first-party in a working tree with the packages pip-installed
+# and third-party in a fresh CI checkout — so import-sort results differed
+# between a developer machine and CI, and lint failed only on the server.
+src = ["src", "tests"]
 target-version = "py311"
 
 [tool.ruff.lint]
