@@ -61,8 +61,8 @@ select = ["E", "F", "I", "N", "UP", "B", "SIM", "RUF"]
 "src/intelligence/serving.py" = ["N803", "N806", "N818"]
 # Same distinction: UniverseNotComputed and LakeNotAdjusted mean a pipeline
 # step has not run yet, which is a state to report rather than a malfunction.
-# Genuine faults in this codebase DO carry the suffix — see LakeEmptyError and
-# InsufficientHistoryError in regime/source.py.
+# Genuine faults elsewhere DO carry the suffix (e.g. ...Error in the quality
+# and ingest layers); these two deliberately do not.
 "src/intelligence/data/lake_client.py" = ["N818"]
 "src/intelligence/explain/*.py" = ["N803", "N806"]
 "src/intelligence/validation/walk_forward.py" = ["E501", "N803", "N806", "RUF001", "RUF002", "SIM", "UP"]
@@ -76,8 +76,6 @@ select = ["E", "F", "I", "N", "UP", "B", "SIM", "RUF"]
 "src/intelligence/models/signals.py" = ["E501", "RUF001", "RUF002", "SIM", "UP"]
 "src/intelligence/models/sizing.py" = ["E501", "RUF001", "RUF002", "SIM", "UP"]
 "src/intelligence/models/base.py" = ["E501", "RUF001", "RUF002", "SIM", "UP", "B"]
-"src/intelligence/regime/classifier.py" = ["E501", "RUF001", "RUF002", "RUF012", "SIM", "UP", "B"]
-"src/intelligence/regime/market.py" = ["E501", "RUF001", "RUF002", "SIM", "UP"]
 "src/intelligence/backtest/*.py" = ["E501", "N803", "N806", "RUF001", "RUF002", "SIM", "UP", "B"]
 "src/intelligence/registry/*.py" = ["E501", "RUF001", "RUF002", "RUF005", "SIM", "UP"]
 "src/intelligence/data/preprocessor.py" = ["E501", "RUF001", "RUF002", "SIM", "UP"]
