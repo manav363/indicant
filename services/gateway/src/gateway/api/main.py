@@ -27,7 +27,7 @@ from gateway.composition.client import (
     first_failure,
     gather_upstreams,
 )
-from gateway.api.terminal import router as terminal_router
+from gateway.api.terminal import router as terminal_router, warm_universe_cache
 from gateway.narrative.templates import render
 
 MARKET_DATA_URL = os.environ.get("INDICANT_MARKET_DATA_URL", "http://market-data:8000")
@@ -45,6 +45,12 @@ app = FastAPI(
 )
 
 app.include_router(terminal_router)
+
+
+@app.on_event("startup")
+async def _warm() -> None:
+    """Fire and forget — startup must not block on an upstream."""
+    asyncio.create_task(warm_universe_cache())
 
 app.add_middleware(
     CORSMiddleware,

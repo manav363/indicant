@@ -24,6 +24,7 @@ than one that never offered it.
 
 from __future__ import annotations
 
+import logging
 import os
 from datetime import date, timedelta
 from typing import Any
@@ -44,6 +45,8 @@ from gateway.composition.client import (
     first_failure,
     gather_upstreams,
 )
+
+logger = logging.getLogger(__name__)
 
 MARKET_DATA_URL = os.environ.get("INDICANT_MARKET_DATA_URL", "http://market-data:8000")
 INTELLIGENCE_URL = os.environ.get("INDICANT_INTELLIGENCE_URL", "http://intelligence:8000")
@@ -292,3 +295,308 @@ async def market() -> dict[str, Any]:
         },
         "degraded": [name for name, r in results.items() if not r.ok],
     }
+
+
+# ==========================================================================
+# The provenance chain
+#
+# The browser can only reach the gateway — market-data and intelligence are not
+# publicly routable. So the evidence tier (quality gate, PIT universe, model
+# card, symbol lineage) needs composed public routes, or it stays unreachable
+# no matter how good the backend is. That was the actual finding behind the v2
+# redesign: 13 built-and-tested endpoints had no way to appear on a screen.
+# ==========================================================================
+
+
+def _pct(value: object, default: float = 0.0) -> float:
+    """Coerce an upstream number to a 0-100 bar width without lying on None."""
+    try:
+        return max(0.0, min(100.0, float(value) * 100.0))  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return default
+
+
+@router.get("/chain")
+async def chain() -> dict[str, Any]:
+    """The five-node provenance rail, in ONE call.
+
+    The rail is on every screen, so fetching its five stages separately would
+    put four extra round trips on every navigation. It is also the only place
+    the pipeline's state is shown as a whole, which is the point of it.
+    """
+    async with httpx.AsyncClient() as client:
+        results = await gather_upstreams(
+            [
+                (_market_data, "lake", "/health", None),
+                (_market_data, "coverage", "/internal/quality/coverage", None),
+                (_intelligence, "model", "/model/current", None),
+            ],
+            client=client,
+        )
+        # The PIT universe is rebuilt from scratch upstream — scoring every one
+        # of ~3,000 symbols — which measured 15.7s. It changes once a trading
+        # day, so it comes from the same cache the search box already warms.
+        # Fetching it here directly made the rail the slowest thing on a page
+        # that shows it on every screen.
+        try:
+            uni = await _eligible_universe(client)
+        except HTTPException:
+            uni = {}
+
+    lake = results["lake"].data if results["lake"].ok else {}
+    cov = results["coverage"].data if results["coverage"].ok else {}
+    model = results["model"].data if results["model"].ok else None
+
+    seen = len(uni.get("symbols", []) or [])
+    eligible = len(uni.get("eligible_symbols", []) or [])
+    p = (model or {}).get("permutation_p_value")
+
+    return {
+        "source": {
+            "label": "Bhavcopy",
+            "value": lake.get("trading_days", 0),
+            "detail": lake.get("last_date"),
+            "ok": bool(lake.get("has_data")),
+        },
+        "gate": {
+            "label": "Quality",
+            "coverage": cov.get("coverage"),
+            "missing": len(cov.get("missing", []) or []),
+            "fill": _pct(cov.get("coverage")),
+        },
+        "universe": {
+            "label": "Eligible",
+            "eligible": eligible,
+            "seen": seen,
+            "fill": (eligible / seen * 100.0) if seen else 0.0,
+        },
+        "model": {
+            "label": "Standing",
+            "trained": model is not None,
+            "runId": (model or {}).get("run_id"),
+            "pValue": p,
+            # Precomputed so no client re-derives the significance rule.
+            "isSignificant": None if p is None else bool(p < 0.05),
+        },
+        "degraded": ([name for name, r in results.items() if not r.ok]
+                     + ([] if uni else ["universe"])),
+    }
+
+
+@router.get("/provenance/{symbol}")
+async def provenance(symbol: str) -> dict[str, Any]:
+    """Lineage and quality for ONE symbol — the right rail of the call screen.
+
+    Neither half is essential. A symbol with no quality row still has a listing
+    history worth showing, and vice versa; blanking the rail because one of two
+    upstreams is unhappy would hide evidence that is actually present.
+    """
+    sym = symbol.strip().upper()
+    async with httpx.AsyncClient() as client:
+        results = await gather_upstreams(
+            [
+                (_market_data, "meta", f"/symbols/{sym}/meta", None),
+                (_market_data, "quality", f"/symbols/{sym}/quality", None),
+            ],
+            client=client,
+        )
+
+    meta = results["meta"].data if results["meta"].ok else None
+    q = results["quality"].data if results["quality"].ok else None
+
+    components = []
+    if q:
+        # Named in the order the scorer weights them, so the rail reads as the
+        # gate's own reasoning rather than an arbitrary list.
+        for key, label in (
+            ("history_completeness", "History completeness"),
+            ("validity_clean_rate", "Validity clean rate"),
+            ("continuity_clean_rate", "Continuity clean rate"),
+            ("liquidity_adequacy", "Liquidity adequacy"),
+            ("recency", "Recency"),
+        ):
+            v = q.get(key)
+            if v is not None:
+                components.append({"key": key, "label": label, "value": float(v)})
+
+    return {
+        "symbol": sym,
+        "meta": meta,
+        "quality": q,
+        "components": components,
+        "historyDays": (q or {}).get("history_days"),
+        "medianTurnover": (q or {}).get("median_turnover"),
+        "degraded": [name for name, r in results.items() if not r.ok],
+    }
+
+
+@router.get("/gate")
+async def gate() -> dict[str, Any]:
+    """Calendar coverage and the six-tier gate.
+
+    `missing` is returned in full rather than summarised to a count. A missing
+    trading day that is merely counted is a missing day nobody can go look at.
+    """
+    async with httpx.AsyncClient() as client:
+        results = await gather_upstreams(
+            [
+                (_market_data, "coverage", "/internal/quality/coverage", None),
+                (_market_data, "lake", "/health", None),
+            ],
+            client=client,
+        )
+
+    if not results["coverage"].ok:
+        raise HTTPException(
+            status_code=503,
+            detail=(results["coverage"].error or ErrorEnvelope(
+                code=ErrorCode.UPSTREAM_UNAVAILABLE,
+                message="coverage unavailable",
+                user_message="We could not read the data-quality report.",
+            )).model_dump(),
+        )
+
+    cov = dict(results["coverage"].data or {})
+    lake = results["lake"].data if results["lake"].ok else {}
+    observed = int(cov.get("observed", 0))
+    missing = list(cov.get("missing", []) or [])
+
+    return {
+        "coverage": cov.get("coverage"),
+        "observed": observed,
+        "expected": observed + len(missing),
+        "missing": missing,
+        "unexpected": list(cov.get("unexpected", []) or []),
+        "uncuratedYears": list(cov.get("uncurated_years", []) or []),
+        "firstDate": lake.get("first_date"),
+        "lastDate": lake.get("last_date"),
+        "tiers": TIERS,
+    }
+
+
+# Static because the tiers are a property of the gate's design, not of a run.
+# The per-run pass/fail comes from /internal/quality/runs, which is deliberately
+# not public — this describes WHAT is checked, which is safe to publish.
+TIERS: list[dict[str, str]] = [
+    {"n": "1", "name": "STRUCTURAL", "what": "Columns, types, and the file shape itself"},
+    {"n": "2", "name": "VALIDITY", "what": "high ≥ low, prices > 0, volume non-negative"},
+    {"n": "3", "name": "COMPLETENESS", "what": "Every expected symbol present on the day"},
+    {"n": "4", "name": "CONTINUITY", "what": "prev_close reconciles across corporate actions"},
+    {"n": "5", "name": "PLAUSIBILITY", "what": "Move and volume within believable bounds"},
+    {"n": "6", "name": "CROSS-SOURCE", "what": "Independent oracle agreement"},
+]
+
+
+# A dropdown of 2,169 refusals is not a screen. Group them so the shape of the
+# refusal is visible, and keep examples so it stays concrete.
+EXCLUSION_GROUPS: list[tuple[str, str]] = [
+    ("has not traded recently", "Delisted or suspended"),
+    ("trading days of history", "Insufficient history"),
+    ("data quality score", "Quality score below floor"),
+    ("liquidity floor", "Below the liquidity floor"),
+]
+
+
+@router.get("/universe/detail")
+async def universe_detail(as_of: date | None = None) -> dict[str, Any]:
+    """The PIT universe with refusals grouped by reason.
+
+    This is the honest version of "no stock falls back": the system does not
+    quietly guess on a thinly-traded shell, it refuses and says which floor was
+    missed.
+    """
+    async with httpx.AsyncClient() as client:
+        if as_of is None:
+            # Cached by trading day — see the note in /chain.
+            uni = await _eligible_universe(client)
+        else:
+            result = await _market_data.get(
+                client, "market-data", f"/universe?as_of={as_of}"
+            )
+            if not result.ok:
+                raise HTTPException(
+                    status_code=503,
+                    detail=(result.error or ErrorEnvelope(
+                        code=ErrorCode.UPSTREAM_UNAVAILABLE,
+                        message="universe unavailable",
+                        user_message="We could not load the tradeable-stock list.",
+                    )).model_dump(),
+                )
+            uni = dict(result.data or {})
+    excluded: dict[str, str] = dict(uni.get("excluded", {}))
+
+    buckets: dict[str, dict[str, Any]] = {}
+    for sym, reason in excluded.items():
+        label = "Other"
+        for needle, name in EXCLUSION_GROUPS:
+            if needle in reason:
+                label = name
+                break
+        b = buckets.setdefault(label, {"reason": label, "count": 0, "examples": []})
+        b["count"] += 1
+        if len(b["examples"]) < 3:
+            b["examples"].append({"symbol": sym, "reason": reason})
+
+    groups = sorted(buckets.values(), key=lambda g: -g["count"])
+    seen = len(uni.get("symbols", []) or [])
+    eligible = len(uni.get("eligible_symbols", []) or [])
+
+    return {
+        "asOf": uni.get("as_of"),
+        "seen": seen,
+        "eligible": eligible,
+        "excluded": len(excluded),
+        "eligibleRatio": (eligible / seen) if seen else 0.0,
+        "groups": groups,
+    }
+
+
+@router.get("/model")
+async def model_card() -> dict[str, Any]:
+    """The model card.
+
+    Returns 503 with a reason when nothing is trained rather than an empty card
+    — "no model" and "a model that reports nothing" must not look the same.
+    """
+    async with httpx.AsyncClient() as client:
+        result = await _intelligence.get(client, "intelligence", "/model/current")
+
+    if not result.ok:
+        raise HTTPException(
+            status_code=result.status_code or 503,
+            detail=(result.error or ErrorEnvelope(
+                code=ErrorCode.MODEL_NOT_TRAINED,
+                message="no model trained",
+                user_message="No model has been trained on this data yet.",
+            )).model_dump(),
+        )
+
+    m = dict(result.data or {})
+    p = m.get("permutation_p_value")
+    return {
+        "runId": m.get("run_id"),
+        "trainedAt": m.get("trained_at"),
+        "modelType": m.get("model_type"),
+        "nFeatures": m.get("n_features"),
+        "universeSize": m.get("universe_size"),
+        "pValue": p,
+        "isSignificant": None if p is None else bool(p < 0.05),
+        "permutations": 200,
+    }
+
+
+async def warm_universe_cache() -> None:
+    """Pay the PIT-universe rebuild once at boot, not on a user's first click.
+
+    Rebuilding it upstream measures ~15s because every symbol is rescored. The
+    cache makes that a once-a-day cost — but "once a day" still lands on
+    whoever arrives first, and that is the chain rail on their very first page.
+
+    Deliberately swallows everything: a cold cache is a slow page, while a
+    failed startup is no page at all. The next request rebuilds it anyway.
+    """
+    try:
+        async with httpx.AsyncClient() as client:
+            await _eligible_universe(client)
+    except Exception as exc:  # noqa: BLE001 - see docstring
+        logger.warning("universe cache warm-up skipped: %s", exc)

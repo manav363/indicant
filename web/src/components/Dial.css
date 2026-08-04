@@ -1,0 +1,67 @@
+.dial { margin-top: var(--s6); }
+.dial__scale { position: relative; height: 88px; }
+
+/* The reading gets its own band. Sharing a row with the needle meant the
+   needle struck through the digits. */
+.dial__readband { position: relative; height: 26px; }
+.dial__read {
+  position: absolute; top: 0; transform: translateX(-50%);
+  font-size: var(--t-sm); font-weight: 600; white-space: nowrap;
+  padding: 1px 8px; border-radius: 3px;
+  background: var(--bg-raised); border: 1px solid var(--line-bright);
+  box-shadow: var(--e1);
+}
+
+.dial__track {
+  position: absolute; left: 0; right: 0; top: 26px; height: 22px;
+  border-radius: 2px; background: var(--bg-input);
+  border: 1px solid var(--line); box-shadow: var(--well);
+}
+
+/* Hatching rather than a flat wash: it survives the monochrome palette, where
+   a colour fill would vanish. */
+.dial__zone { position: absolute; top: 27px; height: 20px; display: flex; align-items: center; }
+.dial__zone--sell {
+  left: 1px; width: 45%; padding-left: var(--s2);
+  background: repeating-linear-gradient(-45deg,
+    var(--dir-down-wash), var(--dir-down-wash) 3px, transparent 3px, transparent 7px);
+}
+.dial__zone--buy {
+  right: 1px; width: 45%; padding-right: var(--s2); justify-content: flex-end;
+  background: repeating-linear-gradient(45deg,
+    var(--dir-up-wash), var(--dir-up-wash) 3px, transparent 3px, transparent 7px);
+}
+.dial__zlabel { font-size: var(--t-2xs); letter-spacing: .12em; color: var(--fg-dim); }
+
+.dial__tick {
+  position: absolute; top: 22px; width: 1px; height: 30px;
+  background: var(--line-bright);
+}
+.dial__tick--mid { background: var(--fg); opacity: .55; height: 38px; top: 18px; }
+
+.dial__needle {
+  position: absolute; top: 26px; width: 2px; height: 30px;
+  background: var(--fg); transform: translateX(-1px);
+  box-shadow: 0 0 10px rgba(232, 230, 227, .6);
+  transition: left var(--dur) var(--ease);
+}
+.dial__needle::before {
+  content: ""; position: absolute; top: -5px; left: -3.5px;
+  border-left: 4.5px solid transparent; border-right: 4.5px solid transparent;
+  border-top: 6px solid var(--fg);
+}
+
+/* Only three scale labels. The .45/.55 numbers live inside the zones, because
+   at this column width their labels collide into mush. */
+.dial__tl {
+  position: absolute; top: 58px;
+  font-family: var(--mono); font-size: var(--t-2xs); color: var(--fg-faint);
+  white-space: nowrap;
+}
+.dial__tl--mid { left: 50%; transform: translateX(-50%); }
+
+.dial__cap {
+  position: absolute; top: 72px; left: 0; right: 0; text-align: center;
+  font-family: var(--mono); font-size: var(--t-2xs);
+  letter-spacing: .12em; text-transform: uppercase; color: var(--fg-faint);
+}

@@ -116,6 +116,63 @@ export interface MarketPulse {
   degraded: string[];
 }
 
+
+/* ── The provenance chain ──────────────────────────────────────────────────
+ * These back the screens that had no UI at all. The browser can only reach
+ * the gateway, so every one of them is a composed public route. */
+
+export interface ChainState {
+  source: { label: string; value: number; detail: string | null; ok: boolean };
+  gate: { label: string; coverage: number | null; missing: number; fill: number };
+  universe: { label: string; eligible: number; seen: number; fill: number };
+  model: {
+    label: string; trained: boolean; runId: string | null;
+    pValue: number | null; isSignificant: boolean | null;
+  };
+  degraded: string[];
+}
+
+export interface SymbolMeta {
+  symbol: string; isin: string | null; name: string | null; sector: string | null;
+  series: string; status: string; first_seen: string; last_seen: string;
+  delisted_on: string | null;
+}
+
+export interface QualityComponent { key: string; label: string; value: number }
+
+export interface Provenance {
+  symbol: string;
+  meta: SymbolMeta | null;
+  quality: Record<string, number | string> | null;
+  components: QualityComponent[];
+  historyDays: number | null;
+  medianTurnover: number | null;
+  degraded: string[];
+}
+
+export interface GateReport {
+  coverage: number | null; observed: number; expected: number;
+  missing: string[]; unexpected: string[]; uncuratedYears: number[];
+  firstDate: string | null; lastDate: string | null;
+  tiers: { n: string; name: string; what: string }[];
+}
+
+export interface ExclusionGroup {
+  reason: string; count: number;
+  examples: { symbol: string; reason: string }[];
+}
+
+export interface UniverseDetail {
+  asOf: string; seen: number; eligible: number; excluded: number;
+  eligibleRatio: number; groups: ExclusionGroup[];
+}
+
+export interface ModelCard {
+  runId: string | null; trainedAt: string | null; modelType: string | null;
+  nFeatures: number | null; universeSize: number | null;
+  pValue: number | null; isSignificant: boolean | null; permutations: number;
+}
+
 export const api = {
   search: (q: string) => req<SearchResult>(`/search?q=${encodeURIComponent(q)}`),
   stock: (sym: string, horizon = 6, lookback = 365) =>
@@ -127,4 +184,11 @@ export const api = {
       `/screen?horizon_months=${horizon}&limit=${limit}&sort=${sort}`,
     ),
   market: () => req<MarketPulse>("/market"),
+
+  chain: () => req<ChainState>("/chain"),
+  provenance: (sym: string) =>
+    req<Provenance>(`/provenance/${encodeURIComponent(sym)}`),
+  gate: () => req<GateReport>("/gate"),
+  universe: () => req<UniverseDetail>("/universe/detail"),
+  model: () => req<ModelCard>("/model"),
 };

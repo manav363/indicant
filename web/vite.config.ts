@@ -10,6 +10,14 @@ export default defineConfig({
       output: { manualChunks: { charts: ["lightweight-charts"] } },
     },
   },
-  server: { proxy: { "/api": "http://localhost:8000" } },
+  // Proxy to nginx (8080), not the gateway directly. Compose stopped
+  // publishing the gateway when nginx became the only ingress, so :8000 has
+  // been a dead address since — and this way dev traverses the same path as
+  // production, including the CSP and the /internal/ 404.
+  server: {
+    proxy: {
+      "/api": process.env.INDICANT_API_ORIGIN || "http://localhost:8080",
+    },
+  },
   test: { environment: "jsdom", globals: true, setupFiles: ["./src/test-setup.ts"] },
 });
