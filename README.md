@@ -127,6 +127,8 @@ flowchart LR
 `market-data` mounts the lake read-write; `intelligence` mounts it **read-only**.
 That boundary is enforced by the Docker mount, not by a code review comment.
 
+> **New to the codebase?** [`docs/how-it-works.md`](docs/how-it-works.md) follows one stock request and one training run through the code, file by file.
+
 ### API surface
 
 29 routes across four services. Only the gateway is public; nginx returns 404
@@ -368,7 +370,7 @@ indicant/
 ├── web/                    React 18 + TypeScript terminal
 ├── infra/                  docker-compose.yml · nginx.conf · security headers
 ├── data/lake/              Parquet — gitignored
-└── docs/assets/            Screenshots
+└── docs/                   how-it-works.md · assets/ (screenshots)
 ```
 
 ---
@@ -436,6 +438,12 @@ it cannot do.**
 | **Training universe is 30 symbols** | Cross-sectional serving must reproduce the training cross-section, which currently caps the screener. |
 | **L5 meta-labelling is untrained** | Implemented and tested; not fitted in the current run. |
 | **Cross-source tier is inactive** | Tier 6 needs a second independent price source. |
+
+---
+
+## How this was built
+
+Indicant was built with AI coding assistance (Claude Code). The reasoning behind the design is in the decisions above and in [`docs/how-it-works.md`](docs/how-it-works.md), and the behaviour the README claims is covered by the test suites that CI runs on every push.
 
 ---
 
